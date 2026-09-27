@@ -1,3 +1,4 @@
+/* ---------- Layout and text ---------- */
 .screen { max-width: 480px; min-height: 100dvh; margin: 0 auto; display: flex; flex-direction: column; gap: 14px;
   padding: max(16px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom)); }
 .head { display: flex; flex-direction: column; gap: 4px; }
@@ -8,6 +9,8 @@ h1 { margin: 0; font-size: 22px; font-weight: 700; }
 .tiny { font-size: 12px; }
 .strong { font-weight: 700; }
 .center { text-align: center; }
+.nowrap { white-space: nowrap; }
+.warn-text { color: var(--warn); }
 .spacer { flex-grow: 1; }
 .col { display: flex; flex-direction: column; gap: 10px; }
 .gap4 { gap: 4px; } .gap8 { gap: 8px; } .gap12 { gap: 12px; }
@@ -15,16 +18,21 @@ h1 { margin: 0; font-size: 22px; font-weight: 700; }
 .inline.base { align-items: baseline; }
 .between { justify-content: space-between; }
 .grow { flex: 1; }
-.grid2, .grid3, .grid4 { display: grid; gap: 8px; }
+.grid2, .grid3 { display: grid; gap: 8px; }
 .grid2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .grid3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.grid4 { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
 .list { display: flex; flex-direction: column; gap: 8px; }
 .row { display: flex; align-items: center; gap: 8px; padding: 0 10px 0 0; }
 .rowmain { flex: 1; text-align: left; background: none; border: none; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
 .topline { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted); gap: 8px; }
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 500; padding: 4px 2px; }
+td { padding: 6px 2px; border-top: 1px solid var(--hairline); }
 
+/* ---------- Buttons and form controls ---------- */
+/* Order matters where two classes set the same property: size classes come after colour classes. */
 button { cursor: pointer; border-radius: 12px; min-height: 48px; }
 button:disabled { opacity: .4; cursor: default; }
 .primary { background: var(--accent); color: #fff; border: none; font-weight: 700; font-size: 16px; }
@@ -33,12 +41,14 @@ button:disabled { opacity: .4; cursor: default; }
 .ghost { background: #fff; border: 1px solid var(--btnline); font-size: 15px; }
 .small { min-height: 36px; padding: 0 12px; font-size: 13px; border-radius: 10px; }
 .danger { background: var(--warn); color: #fff; border: none; }
-.warnbtn { background: #fff; border: 1px solid var(--warn); color: var(--warn); font-weight: 700; font-size: 15px; }
 .link { background: none; border: none; color: var(--accent); font-weight: 700; padding: 0; min-height: 0; text-align: left; font-size: 14px; }
+.link.tiny { font-size: 12px; font-weight: 600; }
 .filebtn { display: flex; align-items: center; justify-content: center; border-radius: 12px; min-height: 48px; cursor: pointer; }
 .filebtn input { display: none; }
+.filebtn.small { min-height: 36px; border-radius: 10px; padding: 0 8px; }
+.grid3 .small { padding: 0 6px; }
 
-.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: #E9E3D6; border-radius: 12px; padding: 4px; gap: 4px; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--seg-bg); border-radius: 12px; padding: 4px; gap: 4px; }
 .seg button { min-height: 40px; border: none; background: none; border-radius: 9px; font-size: 14px; }
 .seg button.on { background: #fff; font-weight: 700; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
 
@@ -46,130 +56,128 @@ button:disabled { opacity: .4; cursor: default; }
 input, select { min-height: 44px; border: 1px solid var(--btnline); border-radius: 10px; padding: 0 12px; background: #fff; font-size: 16px; width: 100%; }
 select { width: auto; }
 .inline input { flex: 1; }
+.check { font-size: 15px; }
+.check input { width: 20px; min-height: 20px; flex: none; accent-color: var(--accent); }
 
-.lineup { display: flex; align-items: center; gap: 8px; }
-.num { width: 26px; height: 26px; border-radius: 13px; background: var(--accent); color: #fff; display: grid; place-items: center; font-size: 13px; font-weight: 700; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { min-height: 36px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--btnline); background: var(--soft); font-size: 14px; }
+.chip.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+.chip.del { border-color: var(--warn); color: var(--warn); background: var(--warn-bg); }
+/* A chip wearing its chart series colour (--c). */
+.chip.on-series { border: 2px solid var(--c); background: #fff; font-weight: 700; box-shadow: inset 0 -3px 0 var(--c); }
 
+/* ---------- Home ---------- */
+.section-title { margin: 8px 0 0; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.group-head { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: none; border: none; border-bottom: 1.5px solid var(--line);
+  border-radius: 0; padding: 6px 2px; min-height: 52px; color: inherit; font: inherit; }
+.group-head .grow { min-width: 0; }
+.group-title { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; }
+.group-date { font-family: 'Barlow Condensed', sans-serif; font-size: 15px; color: var(--muted); font-weight: 600; }
+.chev { font-size: 22px; line-height: 1; color: var(--muted); transition: transform .15s; width: 14px; }
+.chev.open { transform: rotate(90deg); }
+.sync-row { display: flex; justify-content: space-between; align-items: center; padding: 0 14px; gap: 12px; }
+.sync-row .muted { text-align: right; }
+
+/* ---------- Match and practice setup ---------- */
+.lineup { display: flex; align-items: center; gap: 8px; }
+.num { width: 26px; height: 26px; border-radius: 13px; background: var(--accent); color: #fff; display: grid; place-items: center; font-size: 13px; font-weight: 700; }
+
+/* ---------- Recording: scoreboard, hints and the skittle pad ---------- */
 .score { display: flex; flex-direction: column; gap: 2px; }
 .score .label { font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .score.us .label { color: var(--accent); }
 .score.them .label { color: var(--opp); }
 .score.active.us { border: 2px solid var(--accent); }
 .score.active.them { border: 2px solid var(--opp); }
+/* Practice sides share the accent colour; disqualified sides fade out. */
+.score.side .label { color: var(--accent); }
+.score.active.side { border: 2px solid var(--accent); }
+.score.out { opacity: .5; }
+.score .inline.base { flex-wrap: wrap; column-gap: 6px; row-gap: 0; }
+.score .inline.base .muted { white-space: nowrap; }
 .big-num { font-family: 'Barlow Condensed', sans-serif; font-size: 48px; font-weight: 700; line-height: 1; }
+.grid3 .score .big-num { font-size: 40px; }
 .dots { display: flex; gap: 4px; }
 .dot { width: 10px; height: 10px; border-radius: 5px; border: 1.5px solid var(--warn); }
 .dot.on { background: var(--warn); }
+/* Same height with or without the player select, so the pad doesn't shift between turns. */
+.turnhead { min-height: 44px; }
 
 .hint { border-radius: 12px; padding: 10px 14px; font-size: 14px; line-height: 1.5; }
-.hint.info { background: var(--opp-bg); color: #24476A; }
-.hint.warn { background: var(--warn-bg); color: #6B3A17; }
+.hint.info { background: var(--opp-bg); color: var(--hint-info-ink); }
+.hint.warn { background: var(--warn-bg); color: var(--hint-warn-ink); }
 .hint.danger { background: var(--warn); color: #fff; }
 
 .pins { --pin: 52px; --pgap: 8px; display: flex; flex-direction: column; gap: var(--pgap); align-items: center; }
 .pinrow { display: flex; gap: var(--pgap); position: relative; }
-.pin { width: var(--pin); height: var(--pin); border-radius: 50%; border: 1.5px solid var(--btnline); background: #FFFDF8;
+.pin { width: var(--pin); height: var(--pin); border-radius: 50%; border: 1.5px solid var(--btnline); background: var(--paper);
   font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 600; min-height: 0; }
 .pin:active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .pin.win { border: 2.5px solid var(--accent); color: var(--accent); font-weight: 700; }
 .pin.burst { border-color: var(--warn); color: var(--warn); border-style: dashed; }
 /* Outside the setup: 0 sits one pin-width left of pin 1, undo left of the back row. */
 .pin.miss { position: absolute; right: calc(100% + var(--pin) + 2 * var(--pgap)); border-color: var(--warn); color: var(--warn); background: var(--warn-bg); }
-
-.result { background: var(--accent); color: #fff; border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
-.result.lose { background: var(--opp); }
-.result-title { font-size: 28px; font-weight: 700; }
-.huge { font-family: 'Barlow Condensed', sans-serif; font-size: 56px; font-weight: 700; line-height: 1; }
-.dim { opacity: .85; }
-.stat { background: var(--soft); border-radius: 10px; padding: 10px 12px; }
-
-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 500; padding: 4px 2px; }
-td { padding: 6px 2px; border-top: 1px solid #EFEAE0; }
 /* Left edge aligned with the 0 pin (back row is half a pin wider per side than the front row). */
 .undo { position: absolute; right: calc(100% + var(--pin) / 2 + 1.5 * var(--pgap)); width: var(--pin); height: var(--pin); min-height: 0; border-radius: 50%;
   display: grid; place-items: center; background: #fff; border: 1.5px solid var(--btnline); color: var(--accent); }
-/* Same height with or without the player select, so the pad doesn't shift between turns. */
-.turnhead { min-height: 44px; }
 
-/* Match summary score sheet, styled like a paper scoring form. */
-.sheet { background: #FFFDF8; border: 1.5px solid #2B2B2B; border-radius: 4px; }
-.sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1.5px solid #2B2B2B; }
+/* ---------- Results: game end, match summary, stat cards ---------- */
+.result { background: var(--accent); color: #fff; border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.result.lose { background: var(--opp); }
+.result-title { font-size: 28px; font-weight: 700; }
+.finals { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 16px; }
+.huge { font-family: 'Barlow Condensed', sans-serif; font-size: 56px; font-weight: 700; line-height: 1; }
+.dim { opacity: .85; }
+.stat { background: var(--soft); border-radius: 10px; padding: 10px 12px; }
+.game-winner { justify-content: flex-end; font-size: 13px; }
+.game-winner select { min-height: 36px; font-size: 14px; max-width: 60%; }
+
+/* Score sheet, styled like a paper scoring form. */
+.sheet { background: var(--paper); border: 1.5px solid var(--sheet-ink); border-radius: 4px; }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1.5px solid var(--sheet-ink); }
 .sheet-scroll { overflow-x: auto; }
 .sheet table { border-collapse: collapse; font-family: 'Barlow Condensed', 'Zen Kaku Gothic New', sans-serif; font-size: 17px; table-layout: fixed; }
-.sheet th, .sheet td { border: 1px solid #BDB6A6; padding: 3px 4px; text-align: center; height: 28px; }
+.sheet th, .sheet td { border: 1px solid var(--sheet-rule); padding: 3px 4px; text-align: center; height: 28px; }
 .sheet tr > :first-child { border-left: none; }
 .sheet tr > :last-child { border-right: none; }
-.sheet tbody tr:last-child td { border-bottom: 1.5px solid #2B2B2B; }
+.sheet tbody tr:last-child td { border-bottom: 1.5px solid var(--sheet-ink); }
 .sheet th { font-family: 'Zen Kaku Gothic New', sans-serif; font-size: 11px; color: var(--muted); font-weight: 700; }
-.sheet th.team { font-size: 12px; border-bottom: 1px solid #BDB6A6; }
+.sheet th.team { font-size: 12px; border-bottom: 1px solid var(--sheet-rule); }
 .sheet th.team.us { color: var(--accent); }
 .sheet th.team.them { color: var(--opp); }
-.sheet .turn { width: 36px; padding-inline: 2px; color: var(--muted); font-size: 13px; background: #F3EFE6; }
-.sheet th.who { max-width: 56px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink, #2B2B2B); }
-.sheet .idle { background: #F6F2E9; }
-.sheet .tot { font-weight: 700; border-right-width: 1.5px; border-right-color: #2B2B2B; background: #FAF6EC; }
+.sheet th.team.side { color: var(--accent); }
+.sheet .turn { width: 36px; padding-inline: 2px; color: var(--muted); font-size: 13px; background: var(--bg); }
+.sheet th.who { max-width: 56px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+.sheet .idle { background: var(--sheet-idle); }
+.sheet .tot { font-weight: 700; border-right-width: 1.5px; border-right-color: var(--sheet-ink); background: var(--sheet-total); }
 .sheet .miss { color: var(--warn); font-weight: 700; }
 .sheet .over span, .legend.over { text-decoration: underline wavy var(--warn); text-underline-offset: 3px; }
 .sheet .fin span, .legend.fin { display: inline-block; min-width: 26px; border: 1.5px solid var(--accent); border-radius: 50%; color: var(--accent); line-height: 22px; }
 .legend { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 14px; }
 .sheet tfoot td { font-size: 22px; font-weight: 700; height: 36px; }
 .sheet .final.won { color: var(--accent); }
-.group-head { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: none; border: none; border-bottom: 1.5px solid var(--line);
-  border-radius: 0; padding: 6px 2px; min-height: 52px; color: inherit; font: inherit; }
-.chev { font-size: 22px; line-height: 1; color: var(--muted); transition: transform .15s; width: 14px; }
-.chev.open { transform: rotate(90deg); }
-.group-head .grow { min-width: 0; }
-/* Practice sides share the accent colour; disqualified sides fade out. */
-.score.side .label { color: var(--accent); }
-.score.active.side { border: 2px solid var(--accent); }
-.score.out { opacity: .5; }
-.grid3 .score .big-num { font-size: 40px; }
-.sheet th.team.side { color: var(--accent); }
-.finals { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 16px; }
-.score .inline.base { flex-wrap: wrap; column-gap: 6px; row-gap: 0; }
-.score .inline.base .muted { white-space: nowrap; }
-.section-title { margin: 8px 0 0; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-.chip.del { border-color: var(--warn); color: var(--warn); background: var(--warn-bg); }
-.link.tiny { font-size: 12px; font-weight: 600; }
-.nowrap { white-space: nowrap; }
 
-/* Trend small multiples: one series each, recessive grid, tap a point to read it. */
-.trend svg { display: block; overflow: visible; flex-shrink: 0; }
-.trend-plot { display: flex; }
-.trend .grid { stroke: #EFEAE0; stroke-width: 1; }
-.trend .tick, .trend .xlab { font-family: 'Barlow Condensed', sans-serif; font-size: 11px; fill: var(--muted); }
-.trend .tick { text-anchor: end; dominant-baseline: middle; }
-.trend .line.dashed { stroke-dasharray: 6 4; }
-.trend .readout { display: flex; flex-wrap: wrap; gap: 2px 12px; }
-.legend-row { display: flex; flex-wrap: wrap; gap: 4px 16px; }
-.swatch { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; background: var(--c); }
-.swatch.dashed { background: repeating-linear-gradient(90deg, var(--c) 0 5px, transparent 5px 8px); }
-.chip.on-series { border: 2px solid var(--c); background: #fff; font-weight: 700; box-shadow: inset 0 -3px 0 var(--c); }
-.trend .line { fill: none; stroke: var(--c, var(--accent)); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-.trend .dot { fill: var(--c, var(--accent)); stroke: #fff; stroke-width: 2; }
-.trend .dot.open { fill: #fff; stroke: var(--c, var(--accent)); stroke-width: 2; }
-.trend .hit { fill: transparent; cursor: pointer; }
-.table-scroll { overflow-x: auto; }
-.chip.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
-/* Key numbers: tap a row to chart it; ▼ marks a player clearly below the team. */
+/* ---------- Review: key numbers and trend ---------- */
+/* Tap a row to chart it; ▼ marks a player clearly below the team. */
 .kpi tbody tr { cursor: pointer; }
 .kpi tbody tr.on td { background: var(--soft); }
 .kpi td.low .strong, .kpi td.low { color: var(--warn); }
 .kpi td.high .strong { color: var(--accent); }
 .kpi th, .kpi td { vertical-align: top; }
+
+/* Trend: y-axis fixed, plot scrolls sideways; series colour comes in as --c. */
+.trend svg { display: block; overflow: visible; flex-shrink: 0; }
+.trend-plot { display: flex; }
 .trend-scroll { overflow-x: auto; flex: 1; min-width: 0; }
-.trend .xlab.on { fill: var(--text, #2B2B2B); font-weight: 700; }
-.sync-row { display: flex; justify-content: space-between; align-items: center; padding: 0 14px; gap: 12px; }
-.sync-row .muted { text-align: right; }
-.warn-text { color: var(--warn); }
-.check { font-size: 15px; }
-.check input { width: 20px; min-height: 20px; flex: none; accent-color: var(--accent); }
-.game-winner { justify-content: flex-end; font-size: 13px; }
-.game-winner select { min-height: 36px; font-size: 14px; max-width: 60%; }
-.group-title { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; }
-.group-date { font-family: 'Barlow Condensed', sans-serif; font-size: 15px; color: var(--muted); font-weight: 600; }
-.filebtn.small { min-height: 36px; border-radius: 10px; padding: 0 8px; }
-.grid3 .small { padding: 0 6px; }
+.trend .readout { display: flex; flex-wrap: wrap; gap: 2px 12px; }
+.trend .grid { stroke: var(--hairline); stroke-width: 1; }
+.trend .tick, .trend .xlab { font-family: 'Barlow Condensed', sans-serif; font-size: 11px; fill: var(--muted); }
+.trend .tick { text-anchor: end; dominant-baseline: middle; }
+.trend .xlab.on { fill: var(--sheet-ink); font-weight: 700; }
+.trend .line { fill: none; stroke: var(--c, var(--accent)); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.trend .line.dashed { stroke-dasharray: 6 4; }
+.trend .dot { fill: var(--c, var(--accent)); stroke: #fff; stroke-width: 2; }
+.trend .dot.open { fill: #fff; stroke: var(--c, var(--accent)); stroke-width: 2; }
+.trend .hit { fill: transparent; cursor: pointer; }
+.swatch { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; background: var(--c); }
+.swatch.dashed { background: repeating-linear-gradient(90deg, var(--c) 0 5px, transparent 5px 8px); }

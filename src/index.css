@@ -3,6 +3,9 @@
   --bg: #F3EFE6; --card: #FFFFFF; --soft: #F7F4EC; --line: #DDD6C8; --btnline: #D6CFBF;
   --ink: #1E2A22; --muted: #5E6A60; --accent: #2E6B4E; --accent-dark: #1F4C37;
   --warn: #A84B14; --warn-bg: #FBEBDD; --opp: #2F5D8A; --opp-bg: #E6EDF4;
+  /* Paper score sheet and chart surfaces. */
+  --paper: #FFFDF8; --sheet-ink: #2B2B2B; --sheet-rule: #BDB6A6; --sheet-idle: #F6F2E9; --sheet-total: #FAF6EC;
+  --hairline: #EFEAE0; --seg-bg: #E9E3D6; --hint-info-ink: #24476A; --hint-warn-ink: #6B3A17;
   font-family: 'Zen Kaku Gothic New', system-ui, sans-serif; color: var(--ink); background: var(--bg);
   -webkit-tap-highlight-color: transparent;
 }
