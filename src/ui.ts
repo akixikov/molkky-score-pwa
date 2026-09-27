@@ -18,8 +18,7 @@ export type Names = Record<SideId, string>;
 /** Team names, falling back to generic labels when not entered. */
 export const namesOf = (ourTeam: string | undefined, opponent: string): Names => ({ us: ourTeam || 'Us', them: opponent || 'Them' });
 
-/** Practice games list every side (2–6); tournament games are us vs them. */
-export const isPracticeGame = (m: Match) => !!m.sets[0]?.config.sides;
+export { isPracticeGame } from './store';
 
 /** Side names: team names in tournament games, side names in practice games. */
 export const teamNames = (m: Match): Names => {

@@ -53,6 +53,9 @@ export async function saveData(data: AppData): Promise<void> {
   if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
 }
 
+/** Practice games list every side (2–6); tournament games are us vs them. */
+export const isPracticeGame = (m: Match) => !!m.sets[0]?.config.sides;
+
 /** Stamps updatedAt on every match that changed (by identity) between two versions of the data. */
 export function stampChanged(prev: AppData, next: AppData): AppData {
   const before = new Map(prev.matches.map((m) => [m.id, m]));

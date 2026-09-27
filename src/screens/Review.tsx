@@ -1,41 +1,10 @@
 // Review: key numbers for the team and chosen players, and their trend over dates.
 import { useState, type CSSProperties } from 'react';
-import { deriveSet, type DerivedThrow } from '../rules';
-import { pct } from '../stats';
+import { type DerivedThrow } from '../rules';
+import { KPIS, ourThrows, pct, type Kpi } from '../stats';
 import { tournamentKey, type Match } from '../store';
-import { isPracticeGame, type Go } from '../ui';
+import { type Go } from '../ui';
 import { SERIES_COLORS, TEAM_COLOR, TrendChart } from '../components/TrendChart';
-
-export interface KpiValue { v: number; n: number }
-
-export interface Kpi {
-  key: string; label: string; note: string;
-  /** Points per throw rather than a rate. */
-  num?: boolean;
-  pick: (rows: DerivedThrow[]) => KpiValue;
-}
-
-export const hitOf = (rows: DerivedThrow[]): KpiValue => ({ v: rows.length === 0 ? NaN : rows.filter((r) => r.score > 0).length / rows.length, n: rows.length });
-
-/** The key numbers, all counted over every throw (first throws included). */
-export const KPIS: Kpi[] = [
-  // Headline measures first, then hit rates by situation (same order as the trend buttons).
-  { key: 'hit', label: 'Hit rate', note: 'throws scoring 1+', pick: hitOf },
-  {
-    key: 'avg', label: 'Avg score', note: 'points per throw', num: true,
-    pick: (rows) => ({ v: rows.length === 0 ? NaN : rows.reduce((a, r) => a + r.score, 0) / rows.length, n: rows.length }),
-  },
-  {
-    key: 'finish', label: 'Finish rate', note: 'exactly 50 ÷ throws from 38+',
-    pick: (rows) => {
-      const zone = rows.filter((r) => r.before >= 38);
-      return { v: zone.length === 0 ? NaN : zone.filter((r) => r.event === 'Finish').length / zone.length, n: zone.length };
-    },
-  },
-  { key: 'afterMiss', label: 'After a miss', note: 'hit rate after 1 miss', pick: (rows) => hitOf(rows.filter((r) => r.faultStreak === 1)) },
-  { key: 'mid', label: 'Mid-game', note: 'hit rate, turns 4–6', pick: (rows) => hitOf(rows.filter((r) => r.teamIdx >= 4 && r.teamIdx <= 6)) },
-  { key: 'zone', label: 'Finishing zone', note: 'hit rate from 38+', pick: (rows) => hitOf(rows.filter((r) => r.before >= 38)) },
-];
 
 export const kpiFmt = (k: Kpi, v: number, digits = 0) => (k.num ? (Number.isNaN(v) ? '—' : v.toFixed(1)) : pct(v, digits));
 
@@ -43,10 +12,6 @@ export const kpiFmt = (k: Kpi, v: number, digits = 0) => (k.num ? (Number.isNaN(
 export const kpiGap = (k: Kpi) => (k.num ? 0.5 : 0.05);
 
 export const MIN_N = 5;
-
-/** Our throws in a match: our side in tournaments; every side in practice games (all are our players). */
-export const ourRows = (m: Match): DerivedThrow[] =>
-  m.sets.flatMap((x) => deriveSet(x.config, x.records).rows.filter((r) => (isPracticeGame(m) ? !!r.player : r.team === 'us')));
 
 /**
  * Review of tournaments and practice alike: pick the team and any players once; the KPI table and
@@ -70,7 +35,7 @@ export function ReviewBody({ matches }: { matches: Match[] }) {
     label: `${ms[0].date.slice(5)} ${ms[0].tournament || (ms[0].kind === 'practice' ? 'Practice' : '(no name)')}`,
     matches: ms.length,
     games: ms.reduce((a, m) => a + m.sets.length, 0),
-    rows: ms.flatMap(ourRows),
+    rows: ms.flatMap(ourThrows),
   }));
   if (tours.length === 0) return <div className="muted">Nothing recorded yet.</div>;
 

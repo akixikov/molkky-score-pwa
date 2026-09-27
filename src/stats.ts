@@ -1,102 +1,55 @@
-// Team statistics computed from derived sets.
-// Definitions follow the analysis report and the Kanto Prime League
-// public stats (fault = a throw that scores 0).
-import { deriveSet, type DerivedThrow, type SetConfig, type SideId, type ThrowRecord } from './rules';
+// Key numbers (KPIs) over derived throws. Every screen and test uses these definitions.
+// A miss is a throw that scores 0 (fouls included); first throws are counted like any other.
+import { deriveSet, type DerivedThrow, type SideId } from './rules';
+import { isPracticeGame, type Match, type SetEntry } from './store';
 
-export interface SetInput {
-  config: SetConfig;
-  records: ThrowRecord[];
-}
-
-export interface Rate {
+export interface KpiValue {
+  v: number;
+  /** Throws the value is based on. */
   n: number;
-  hits: number;
-  /** Share of throws that scored 0. NaN when n = 0. */
-  fault: number;
 }
 
-export interface TeamStats {
-  sets: number;
-  throws: number;
-  finishedSets: number;
-  /** Mean team throws in sets the team finished at exactly 50. */
-  throwsPerFinishedSet: number;
-  bursts: number;
-  overall: Rate;
-  /** After exactly one consecutive miss. */
-  afterOneMiss: Rate;
-  /** After two consecutive misses (the brink). */
-  afterTwoMisses: Rate;
-  /** Team throws 4 to 6 within a set. */
-  throws4to6: Rate;
-  /** Score before the throw is 26 or more. */
-  over26: Rate;
-  /** Score before the throw is 38 or more (finish zone). */
-  over38: Rate;
-  firstThrowAvg: number;
+export interface Kpi {
+  key: string;
+  label: string;
+  note: string;
+  /** Points per throw rather than a rate. */
+  num?: boolean;
+  pick: (rows: DerivedThrow[]) => KpiValue;
 }
 
-export interface PlayerStats {
-  player: string;
-  /** All throws except the team's first throw of a set. */
-  nonFirst: Rate;
-  avgScore: number;
-  /** Throws taken from 38 or more. */
-  zone: Rate;
-  zoneFinishes: number;
-  /** Throws taken with 5 to 9 remaining, and how many finished. */
-  rem5to9: { n: number; finishes: number };
-}
+export const hitOf = (rows: DerivedThrow[]): KpiValue => ({ v: rows.length === 0 ? NaN : rows.filter((r) => r.score > 0).length / rows.length, n: rows.length });
+export const avgOf = (rows: DerivedThrow[]): KpiValue => ({ v: rows.length === 0 ? NaN : rows.reduce((a, r) => a + r.score, 0) / rows.length, n: rows.length });
 
-function rate(rows: DerivedThrow[]): Rate {
-  const n = rows.length;
-  const hits = rows.filter((r) => r.score > 0).length;
-  return { n, hits, fault: n === 0 ? NaN : (n - hits) / n };
-}
+/** Headline measures first, then hit rates by situation (the order shown everywhere). */
+export const KPIS: Kpi[] = [
+  { key: 'hit', label: 'Hit rate', note: 'throws scoring 1+', pick: hitOf },
+  { key: 'avg', label: 'Avg score', note: 'points per throw', num: true, pick: avgOf },
+  {
+    key: 'finish', label: 'Finish rate', note: 'exactly 50 ÷ throws from 38+',
+    pick: (rows) => {
+      const zone = rows.filter((r) => r.before >= 38);
+      return { v: zone.length === 0 ? NaN : zone.filter((r) => r.event === 'Finish').length / zone.length, n: zone.length };
+    },
+  },
+  { key: 'afterMiss', label: 'After a miss', note: 'hit rate after 1 miss', pick: (rows) => hitOf(rows.filter((r) => r.faultStreak === 1)) },
+  { key: 'mid', label: 'Mid-game', note: 'hit rate, turns 4–6', pick: (rows) => hitOf(rows.filter((r) => r.teamIdx >= 4 && r.teamIdx <= 6)) },
+  { key: 'zone', label: 'Finishing zone', note: 'hit rate from 38+', pick: (rows) => hitOf(rows.filter((r) => r.before >= 38)) },
+];
 
-/** Rows per set for one side, or for every side when team is null. */
-function teamRows(sets: SetInput[], team: SideId | null): DerivedThrow[][] {
-  return sets.map((s) => deriveSet(s.config, s.records).rows.filter((r) => team === null || r.team === team));
-}
+/** Derived throws of the given games, of one side or of every side (null). */
+export const throwsOf = (sets: SetEntry[], team: SideId | null): DerivedThrow[] =>
+  sets.flatMap((s) => deriveSet(s.config, s.records).rows.filter((r) => team === null || r.team === team));
 
-export function teamStats(sets: SetInput[], team: SideId = 'us'): TeamStats {
-  const perSet = teamRows(sets, team).filter((rows) => rows.length > 0);
-  const all = perSet.flat();
-  const finished = perSet.filter((rows) => rows.some((r) => r.event === 'Finish'));
-  const firsts = perSet.map((rows) => rows[0].score);
-  return {
-    sets: perSet.length,
-    throws: all.length,
-    finishedSets: finished.length,
-    throwsPerFinishedSet: finished.length === 0 ? NaN : finished.reduce((a, r) => a + r.length, 0) / finished.length,
-    bursts: all.filter((r) => r.event === 'Over').length,
-    overall: rate(all),
-    afterOneMiss: rate(all.filter((r) => r.faultStreak === 1)),
-    afterTwoMisses: rate(all.filter((r) => r.faultStreak === 2)),
-    throws4to6: rate(all.filter((r) => r.teamIdx >= 4 && r.teamIdx <= 6)),
-    over26: rate(all.filter((r) => r.before >= 26)),
-    over38: rate(all.filter((r) => r.before >= 38)),
-    firstThrowAvg: firsts.length === 0 ? NaN : firsts.reduce((a, b) => a + b, 0) / firsts.length,
-  };
-}
+/** Our throws in a match: our side in tournaments; every side in practice games (all are our players). */
+export const ourThrows = (m: Match): DerivedThrow[] =>
+  isPracticeGame(m) ? throwsOf(m.sets, null).filter((r) => !!r.player) : throwsOf(m.sets, 'us');
 
-/** Per-player stats for one side ('us' by default), or for every side's players when team is null. */
-export function playerStats(sets: SetInput[], team: SideId | null = 'us'): PlayerStats[] {
-  const rows = teamRows(sets, team).flat().filter((r) => r.teamIdx > 1 && r.player);
-  const names = [...new Set(rows.map((r) => r.player as string))];
-  return names.map((player) => {
-    const mine = rows.filter((r) => r.player === player);
-    const zone = mine.filter((r) => r.before >= 38);
-    const band = mine.filter((r) => r.remaining >= 5 && r.remaining <= 9);
-    return {
-      player,
-      nonFirst: rate(mine),
-      avgScore: mine.reduce((a, r) => a + r.score, 0) / mine.length,
-      zone: rate(zone),
-      zoneFinishes: zone.filter((r) => r.event === 'Finish').length,
-      rem5to9: { n: band.length, finishes: band.filter((r) => r.event === 'Finish').length },
-    };
-  });
+/** Times each player reached exactly 50, in order of first finish. */
+export function finishers(rows: DerivedThrow[]): [string, number][] {
+  const count = new Map<string, number>();
+  rows.filter((r) => r.event === 'Finish').forEach((r) => count.set(r.player ?? '', (count.get(r.player ?? '') ?? 0) + 1));
+  return [...count];
 }
 
 export function pct(x: number, digits = 1): string {
