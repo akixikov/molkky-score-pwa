@@ -1,6 +1,6 @@
 # モルック記録 PWA（molkky-score-pwa）
 
-チーム（3〜4人）が大会・練習でモルックの投擲をスマホに記録し、作戦ヒントと振り返り（チームと個人の KPI 推移）を得る PWA。チーム共有の Google スプレッドシートと同期できる。
+チーム（3〜4人）が大会・練習でモルックの投擲をスマホに記録し、振り返り（チームと個人の KPI 推移）を得る PWA。戦況の分析や助言は記録後にオフラインで行う方針で、入力中のヒントは出さない。チーム共有の Google スプレッドシートと同期できる。
 公開先: https://akixikov.github.io/molkky-score-pwa/ （`main` への push で GitHub Actions が自動デプロイ）
 
 ## コマンド
@@ -9,7 +9,7 @@
 - `npm run build` — `tsc -b && vite build`。push 前に必ずテストとビルドを通す
 
 ## 構成
-- `src/rules.ts` — ルールエンジン。得点・50超→25・上がり（ちょうど50）・3連続ミス失格・次のサイドと投擲者・ヒントを**すべてここで導出**（2〜6サイド対応）
+- `src/rules.ts` — ルールエンジン。得点・50超→25・上がり（ちょうど50）・3連続ミス失格・次のサイドと投擲者を**すべてここで導出**（2〜6サイド対応）
 - `src/stats.ts` — KPI の唯一の定義（Hit rate / Avg score / Finish rate / After a miss / Mid-game / Finishing zone）と「自チームの投擲」の範囲。画面とテストはこれだけを使う
 - `src/store.ts` — IndexedDB（idb-keyval）保存、CSV 書き出し（`rowsForMatch` はシート同期と共通）
 - `src/sync.ts` — チーム共有シートとの同期（設定・未送信キュー・送信・取り込み）。設定と合言葉は本体データ・バックアップと別に保存。`src/useTeamSync.ts` が画面側の状態

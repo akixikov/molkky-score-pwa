@@ -46,7 +46,7 @@ export function Play({ match, update, go }: { match: Match; data: AppData; updat
       <ThrowInput
         key={next} state={state} team={next} name={names[next]} player={player}
         lineup={nextLineup.length > 1 ? nextLineup : undefined} onPlayer={setOverride}
-        hints={practice || next === 'us'} onThrow={add} canUndo={set.records.length > 0} onUndo={undo}
+        onThrow={add} canUndo={set.records.length > 0} onUndo={undo}
       />
       <div className="spacer" />
       {manual ? (

@@ -1,5 +1,5 @@
-// Input screen parts: the scoreboard, strategy hints and the skittle score pad.
-import { hintsFor, PIN_ROWS, WIN_SCORE, type SetState, type SideId, type ThrowRecord } from '../rules';
+// Input screen parts: the scoreboard and the skittle score pad.
+import { PIN_ROWS, WIN_SCORE, type SetState, type SideId, type ThrowRecord } from '../rules';
 import { type Names, sideClass } from '../ui';
 
 export function Scoreboard({ state, current, names }: { state: SetState; current: SideId | null; names: Names }) {
@@ -24,25 +24,10 @@ export function Scoreboard({ state, current, names }: { state: SetState; current
   );
 }
 
-function Hints({ state, team }: { state: SetState; team: SideId }) {
-  const hints = hintsFor(state, team);
-  if (hints.length === 0) return null;
-  return (
-    <div className="col gap8">
-      {hints.map((h) => (
-        <div key={h.title} className={`hint ${h.level}`}>
-          <div className="strong">{h.title}</div>
-          <div>{h.body}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 /** Score pad laid out like the initial pin setup; one tap records a throw of that score. */
-export function ThrowInput({ state, team, name, player, lineup, onPlayer, hints, onThrow, canUndo, onUndo }: {
+export function ThrowInput({ state, team, name, player, lineup, onPlayer, onThrow, canUndo, onUndo }: {
   state: SetState; team: SideId; name: string; player?: string; lineup?: string[];
-  onPlayer?: (p: string) => void; hints: boolean; onThrow: (r: Omit<ThrowRecord, 'id' | 'ts'>) => void;
+  onPlayer?: (p: string) => void; onThrow: (r: Omit<ThrowRecord, 'id' | 'ts'>) => void;
   canUndo: boolean; onUndo: () => void;
 }) {
   const t = state.teams[team];
@@ -82,7 +67,6 @@ export function ThrowInput({ state, team, name, player, lineup, onPlayer, hints,
           {need} to finish{need > 12 ? ' (2+ turns)' : ''} · misses in a row: {t.faultStreak}
         </div>
       </div>
-      {hints && <Hints state={state} team={team} />}
     </>
   );
 }

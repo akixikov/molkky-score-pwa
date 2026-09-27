@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyThrow, deriveSet, hintsFor, sidesOf, type SetConfig, type ThrowRecord } from './rules';
+import { applyThrow, deriveSet, sidesOf, type SetConfig, type ThrowRecord } from './rules';
 
 let seq = 0;
 const t = (team: string, score: number, player?: string): ThrowRecord => ({
@@ -125,30 +125,4 @@ describe('practice games (2–6 sides)', () => {
     expect(s.endReason).toBe('finish');
   });
 
-  it('hints look at the closest rival still in the game', () => {
-    const recs = [t('s2', 0), t('s3', 12), t('s1', 12), t('s2', 0), t('s3', 12), t('s1', 12), t('s2', 0), t('s3', 12), t('s1', 3)];
-    // s2 is out; s3 has 36 and s1 has 27, so s1 is warned about s3 only when s3 reaches 38.
-    const s = deriveSet(solo, [...recs, t('s3', 2)]);
-    expect(hintsFor(s, 's1').some((h) => h.title === 'Opponent needs 12')).toBe(true);
-  });
-});
-
-describe('hintsFor', () => {
-  const cfg: SetConfig = { firstTeam: 'us', lineup: ['A'] };
-  it('warns after one miss', () => {
-    const s = deriveSet(cfg, [t('us', 0), t('them', 3)]);
-    expect(hintsFor(s, 'us').map((h) => h.title)).toContain('1 miss: play it safe');
-  });
-  it('suggests the 41–45 landing band', () => {
-    const s = deriveSet(cfg, [t('us', 12), t('them', 3), t('us', 12), t('them', 3), t('us', 11)]);
-    // 35 → need 6〜10
-    const h = hintsFor(s, 'us').find((x) => x.title === 'Target');
-    expect(h?.body).toContain('6–10');
-  });
-  it('flags remaining 1', () => {
-    const recs = [12, 12, 12, 12, 1].flatMap((sc) => [t('us', sc), t('them', 1)]);
-    const s = deriveSet(cfg, recs);
-    expect(s.teams.us.score).toBe(49);
-    expect(hintsFor(s, 'us').some((h) => h.title === '1 to go')).toBe(true);
-  });
 });

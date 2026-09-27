@@ -82,7 +82,7 @@ select { width: auto; }
 .lineup { display: flex; align-items: center; gap: 8px; }
 .num { width: 26px; height: 26px; border-radius: 13px; background: var(--accent); color: #fff; display: grid; place-items: center; font-size: 13px; font-weight: 700; }
 
-/* ---------- Recording: scoreboard, hints and the skittle pad ---------- */
+/* ---------- Recording: scoreboard and the skittle pad ---------- */
 .score { display: flex; flex-direction: column; gap: 2px; }
 .score .label { font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .score.us .label { color: var(--accent); }
@@ -102,11 +102,6 @@ select { width: auto; }
 .dot.on { background: var(--warn); }
 /* Same height with or without the player select, so the pad doesn't shift between turns. */
 .turnhead { min-height: 44px; }
-
-.hint { border-radius: 12px; padding: 10px 14px; font-size: 14px; line-height: 1.5; }
-.hint.info { background: var(--opp-bg); color: var(--hint-info-ink); }
-.hint.warn { background: var(--warn-bg); color: var(--hint-warn-ink); }
-.hint.danger { background: var(--warn); color: #fff; }
 
 .pins { --pin: 52px; --pgap: 8px; display: flex; flex-direction: column; gap: var(--pgap); align-items: center; }
 .pinrow { display: flex; gap: var(--pgap); position: relative; }
