@@ -377,8 +377,10 @@ function Home({ data, all, update, go, sync }: { data: AppData; all: Match[]; up
                   <button className="group-head" aria-expanded={isOpen} onClick={() => toggleGroup(key)}>
                     <span className={`chev ${isOpen ? 'open' : ''}`} aria-hidden>›</span>
                     <div className="grow">
-                      <div className="strong">{first.tournament || (first.kind === 'practice' ? first.date : '(no tournament)')}</div>
-                      {(first.kind === 'tournament' || first.tournament) && <div className="sub">{first.date}</div>}
+                      <div className="group-title">
+                        <span className="group-date">{first.date}</span>
+                        <span className="strong">{first.tournament || (first.kind === 'practice' ? 'Practice' : '(no tournament)')}</span>
+                      </div>
                     </div>
                     <div className="sub">
                       {ms.every(isPracticeGame)
@@ -1106,6 +1108,23 @@ function MatchSummary({ match, update, go }: { match: Match; update: Update; go:
     setArmed(null);
   };
   const [editNames, setEditNames] = useState(false);
+  // Correct a game's winner afterwards (e.g. won on time, or the record ended early). '' = from the throws.
+  const setGameWinner = (setId: string, w: string) =>
+    update((d) => patchMatch(d, match.id, (m) => ({ ...m, sets: m.sets.map((x) => (x.id === setId ? { ...x, manualWinner: w || undefined, closed: true } : x)) })));
+  const winnerPicker = (set: SetEntry) => {
+    if (match.remoteBy) return null;
+    const st = deriveSet(set.config, set.records);
+    const names = teamNames(match);
+    return (
+      <label className="inline game-winner muted">
+        Game {set.setNo} winner
+        <select value={set.manualWinner ?? ''} onChange={(e) => setGameWinner(set.id, e.target.value)}>
+          <option value="">From the throws{st.winner ? ` (${names[st.winner]})` : ' (none)'}</option>
+          {st.order.map((x) => <option key={x.id} value={x.id}>{names[x.id]}</option>)}
+        </select>
+      </label>
+    );
+  };
   const setField = (field: 'ourTeam' | 'opponent', v: string) => update((d) => patchMatch(d, match.id, (m) => ({ ...m, [field]: v })));
   const won = match.sets.filter((s) => setWinner(s) === 'us').length;
   const lost = match.sets.filter((s) => setWinner(s) === 'them').length;
@@ -1130,6 +1149,7 @@ function MatchSummary({ match, update, go }: { match: Match; update: Update; go:
         {readOnly}
         <PlayersCard title="This game" sets={match.sets} />
         <ScoreSheet set={set} names={teamNames(match)} />
+        {winnerPicker(set)}
         {legend}
         <div className="spacer" />
         {!match.remoteBy && <button className="ghost" onClick={() => go({ name: 'play', matchId: match.id })}>Continue / fix record</button>}
@@ -1160,14 +1180,17 @@ function MatchSummary({ match, update, go }: { match: Match; update: Update; go:
       )}
       <TeamStatsCard title={`${teamNames(match).us} this match`} sets={match.sets} />
       {match.sets.map((set) => (
-        <ScoreSheet key={set.id} set={set} names={teamNames(match)} action={match.sets.length > 1 && !match.remoteBy && (
-          <button
-            className={armed === set.id ? 'danger small' : 'ghost small'}
-            onClick={() => (armed === set.id ? deleteGame(set.id) : setArmed(set.id))}
-          >
-            {armed === set.id ? 'Really delete' : 'Delete'}
-          </button>
-        )} />
+        <div key={set.id} className="col gap4">
+          <ScoreSheet set={set} names={teamNames(match)} action={match.sets.length > 1 && !match.remoteBy && (
+            <button
+              className={armed === set.id ? 'danger small' : 'ghost small'}
+              onClick={() => (armed === set.id ? deleteGame(set.id) : setArmed(set.id))}
+            >
+              {armed === set.id ? 'Really delete' : 'Delete'}
+            </button>
+          )} />
+          {winnerPicker(set)}
+        </div>
       ))}
       {legend}
       <div className="spacer" />

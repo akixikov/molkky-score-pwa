@@ -167,3 +167,7 @@ td { padding: 6px 2px; border-top: 1px solid #EFEAE0; }
 .warn-text { color: var(--warn); }
 .check { font-size: 15px; }
 .check input { width: 20px; min-height: 20px; flex: none; accent-color: var(--accent); }
+.game-winner { justify-content: flex-end; font-size: 13px; }
+.game-winner select { min-height: 36px; font-size: 14px; max-width: 60%; }
+.group-title { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; }
+.group-date { font-family: 'Barlow Condensed', sans-serif; font-size: 15px; color: var(--muted); font-weight: 600; }
