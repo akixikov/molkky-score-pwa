@@ -309,7 +309,7 @@ function patchCurrentSet(m: Match, fn: (s: SetEntry) => SetEntry): Match {
 
 /* ---------------- Home ---------------- */
 
-const COLLAPSED_KEY = 'molkky-collapsed-groups';
+const EXPANDED_KEY = 'molkky-expanded-groups';
 
 function Home({ data, all, update, go, sync }: { data: AppData; all: Match[]; update: Update; go: Go; sync: Sync }) {
   const [armed, setArmed] = useState<string | null>(null);
@@ -330,21 +330,19 @@ function Home({ data, all, update, go, sync }: { data: AppData; all: Match[]; up
     const key = tournamentKey(m);
     groups.set(key, [...(groups.get(key) ?? []), m]);
   }
-  // Collapsed groups, remembered on this device. New groups start expanded;
-  // on first use only the newest group of each section is expanded.
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+  // Groups start collapsed each time the app opens; ones opened stay open while it runs.
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
     try {
-      const saved = localStorage.getItem(COLLAPSED_KEY);
+      const saved = sessionStorage.getItem(EXPANDED_KEY);
       if (saved) return new Set(JSON.parse(saved) as string[]);
     } catch { /* storage unavailable */ }
-    const newest = new Set(['tournament', 'practice'].map((k) => [...groups].find(([, ms]) => ms[0].kind === k)?.[0]));
-    return new Set([...groups.keys()].filter((k) => !newest.has(k)));
+    return new Set();
   });
   const toggleGroup = (key: string) => {
-    const next = new Set(collapsed);
+    const next = new Set(expanded);
     if (next.has(key)) next.delete(key); else next.add(key);
-    setCollapsed(next);
-    try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
+    setExpanded(next);
+    try { sessionStorage.setItem(EXPANDED_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
   };
   const result = (m: Match) => {
     const won = m.sets.filter((s) => setWinner(s) === 'us').length;
@@ -372,7 +370,7 @@ function Home({ data, all, update, go, sync }: { data: AppData; all: Match[]; up
               const rs = ms.map(result).filter((r) => r.decided);
               const w = rs.filter((r) => r.won > r.lost).length;
               const l = rs.filter((r) => r.won < r.lost).length;
-              const isOpen = !collapsed.has(key);
+              const isOpen = expanded.has(key);
               return (
                 <section key={key} className="list">
                   <button className="group-head" aria-expanded={isOpen} onClick={() => toggleGroup(key)}>
