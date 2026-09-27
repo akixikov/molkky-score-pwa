@@ -29,8 +29,6 @@ export interface AppData {
   version: 1;
   roster: string[];
   matches: Match[];
-  /** Free-text result per tournament (e.g. "Runner-up"), keyed by tournamentKey. */
-  tournamentResults?: Record<string, string>;
 }
 
 const KEY = 'molkky-data-v1';

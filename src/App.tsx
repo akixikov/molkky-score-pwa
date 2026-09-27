@@ -154,10 +154,7 @@ function Home({ data, update, go }: { data: AppData; update: Update; go: Go }) {
                   <button className="group-head" aria-expanded={isOpen} onClick={() => toggleGroup(key)}>
                     <span className={`chev ${isOpen ? 'open' : ''}`} aria-hidden>›</span>
                     <div className="grow">
-                      <div className="inline">
-                        <span className="strong">{first.tournament || (first.kind === 'practice' ? first.date : '(no tournament)')}</span>
-                        {first.kind === 'tournament' && data.tournamentResults?.[key] && <span className="result-tag">{data.tournamentResults[key]}</span>}
-                      </div>
+                      <div className="strong">{first.tournament || (first.kind === 'practice' ? first.date : '(no tournament)')}</div>
                       {(first.kind === 'tournament' || first.tournament) && <div className="sub">{first.date}</div>}
                     </div>
                     <div className="sub">
@@ -166,19 +163,6 @@ function Home({ data, update, go }: { data: AppData; update: Update; go: Go }) {
                         : `${ms.length} ${ms.length === 1 ? 'match' : 'matches'} · ${w}W ${l}L`}
                     </div>
                   </button>
-                  {isOpen && first.kind === 'tournament' && (
-                    <label className="field">
-                      Result
-                      <input
-                        value={data.tournamentResults?.[key] ?? ''}
-                        placeholder="e.g. Runner-up, out in qualifiers"
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          update((d) => ({ ...d, tournamentResults: { ...d.tournamentResults, [key]: v } }));
-                        }}
-                      />
-                    </label>
-                  )}
                   {isOpen && ms.map((m) => {
                     const { won, lost, winner, decided } = result(m);
                     const practice = isPracticeGame(m);

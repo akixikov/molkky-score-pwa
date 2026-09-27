@@ -122,8 +122,6 @@ td { padding: 6px 2px; border-top: 1px solid #EFEAE0; }
 .chev { font-size: 22px; line-height: 1; color: var(--muted); transition: transform .15s; width: 14px; }
 .chev.open { transform: rotate(90deg); }
 .group-head .grow { min-width: 0; }
-.group-head .inline { align-items: first baseline; }
-.result-tag { flex-shrink: 1; min-width: 0; font-size: 12px; font-weight: 700; color: var(--accent); background: var(--soft); border-radius: 8px; padding: 2px 8px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Practice sides share the accent colour; disqualified sides fade out. */
 .score.side .label { color: var(--accent); }
 .score.active.side { border: 2px solid var(--accent); }
