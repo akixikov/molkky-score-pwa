@@ -5,7 +5,7 @@
 
 ## コマンド
 - `npm install` / `npm run dev`（http://localhost:5173/molkky-score-pwa/）
-- `npx vitest run` — テスト。`fixtures-private/molkkylog.json` があれば実データ照合テストも走る
+- `npm test`（= `vitest run`）— テスト。`fixtures-private/molkkylog.json` があれば実データ照合テストも走る
 - `npm run build` — `tsc -b && vite build`。push 前に必ずテストとビルドを通す
 
 ## 構成
@@ -30,5 +30,5 @@
 - 実データ照合の期待値（大会41ゲーム、ミス率＝1−ヒット率）: 全体22.2%、1ミス直後32.1%、4〜6投目28.6%、26点以上28.6%、38点以上34.5%。全77ゲーム: 50超→25 が2回、2ミス後ヒット22/23
 
 ## 開発環境の注意
-- CI は Node 22。開発コンテナの Node が古い場合は `npx -p node@22 node node_modules/vitest/vitest.mjs run` のように Node 22 で実行する
+- Node 22.12 以上が必要（`.nvmrc` は 22、`package.json` の `engines` は >=22.12。CI は `.nvmrc` を読む）。開発コンテナの Node が古い場合は `npx -p node@22 node node_modules/vitest/vitest.mjs run` のように Node 22 で実行する
 

@@ -13,7 +13,7 @@
 ```sh
 npm install
 npm run dev        # http://localhost:5173/molkky-score-pwa/
-npx vitest run     # テスト（Node 22）
+npm test           # テスト（Node 22.12 以上。`.nvmrc` は 22）
 npm run build
 ```
 
