@@ -88,8 +88,9 @@ export function Home({ data, all, update, go, sync }: { data: AppData; all: Matc
                     const { won, lost, winner, decided } = result(m);
                     const practice = isPracticeGame(m);
                     const names = teamNames(m);
+                    const confirming = armed === m.id;
                     return (
-                      <div key={m.id} className="card row">
+                      <div key={m.id} className={`card row ${confirming && m.remoteBy ? 'confirm-other' : ''}`}>
                         <button className="rowmain" onClick={() => go({ name: decided || m.remoteBy ? 'match' : 'play', matchId: m.id })}>
                           <div className="strong">
                             {practice
@@ -100,18 +101,22 @@ export function Home({ data, all, update, go, sync }: { data: AppData; all: Matc
                             ? <div className="sub">In progress</div>
                             : practice && winner && <div className="sub">Winner: {names[winner]}</div>}
                           {m.remoteBy && <div className="sub">by {m.remoteBy}</div>}
+                          {confirming && m.remoteBy && (
+                            <div className="warn-text tiny">Recorded on {m.remoteBy}'s phone. Deleting removes it for everyone.</div>
+                          )}
                         </button>
-                        {!m.remoteBy && <button
-                          className={armed === m.id ? 'danger small' : 'ghost small'}
+                        <button
+                          className={confirming ? 'danger small' : 'ghost small'}
                           onClick={() => {
-                            if (armed === m.id) {
-                              update((d) => ({ ...d, matches: d.matches.filter((x) => x.id !== m.id) }));
-                              setArmed(null);
-                            } else setArmed(m.id);
+                            if (!confirming) { setArmed(m.id); return; }
+                            // Own matches go through the normal change queue; a teammate's is deleted on the sheet.
+                            if (m.remoteBy) sync.deleteOther(m.id);
+                            else update((d) => ({ ...d, matches: d.matches.filter((x) => x.id !== m.id) }));
+                            setArmed(null);
                           }}
                         >
-                          {armed === m.id ? 'Really delete' : 'Delete'}
-                        </button>}
+                          {confirming ? (m.remoteBy ? 'Delete for all' : 'Really delete') : 'Delete'}
+                        </button>
                       </div>
                     );
                   })}

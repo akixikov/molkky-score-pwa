@@ -16,7 +16,11 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'home' });
   // The latest data, so consecutive updates and the sync see every change in order.
   const dataRef = useRef<AppData | null>(null);
-  const sync = useTeamSync(() => dataRef.current?.matches ?? []);
+  const sync = useTeamSync(
+    () => dataRef.current?.matches ?? [],
+    // The sheet removed (teammate deleted) or brought back (undeleted there) some of this device's matches.
+    ({ remove, restore }) => update((d) => ({ ...d, matches: [...d.matches.filter((m) => !remove.includes(m.id)), ...restore] })),
+  );
 
   useEffect(() => {
     loadData().then((d) => {

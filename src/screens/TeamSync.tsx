@@ -2,9 +2,9 @@
 import { useState, type ChangeEvent } from 'react';
 
 import { type Match } from '../store';
-import { errorText, isConfigured, newSettings, ping, URL_RE, type SyncSettings } from '../sync';
+import { errorText, isConfigured, newSettings, pendingCount, ping, URL_RE, type SyncSettings } from '../sync';
 import { type Go } from '../ui';
-import { type Sync, clock } from '../useTeamSync';
+import { type Sync, clock, showsWhenIdle } from '../useTeamSync';
 
 /** Connects this phone to the team spreadsheet's web app. */
 export function TeamSync({ sync, matches, go }: { sync: Sync; matches: Match[]; go: Go }) {
@@ -15,7 +15,7 @@ export function TeamSync({ sync, matches, go }: { sync: Sync; matches: Match[]; 
   const urlOk = URL_RE.test(clean.url);
   const valid = urlOk && !!clean.token && !!clean.recorder;
   const on = isConfigured(sync.settings);
-  const pending = sync.queue.put.length + sync.queue.del.length;
+  const pending = pendingCount(sync.queue);
   const field = (k: 'url' | 'token' | 'recorder') => (e: ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
   const testConnection = async () => {
     setTest('Testing…');
@@ -51,7 +51,7 @@ export function TeamSync({ sync, matches, go }: { sync: Sync; matches: Match[]; 
           <div className="strong">Status</div>
           <div>{pending} unsent · {sync.status.lastSync ? `last sync ${clock(sync.status.lastSync)}` : 'not synced yet'}</div>
           <div className="muted">{sync.remote.length} {sync.remote.length === 1 ? 'match' : 'matches'} from teammates</div>
-          {sync.status.lastError && pending > 0 && <div className="warn-text">{errorText(sync.status.lastError)}</div>}
+          {sync.status.lastError && (pending > 0 || showsWhenIdle(sync.status.lastError)) && <div className="warn-text">{errorText(sync.status.lastError)}</div>}
           <button className="ghost" disabled={sync.busy} onClick={() => void sync.run(true)}>{sync.busy ? 'Syncing…' : 'Sync now'}</button>
           <div className="muted tiny">
             Changes are sent automatically, and teammates' matches are fetched when the app opens and after sending. Sync now does both right away.

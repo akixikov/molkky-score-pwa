@@ -2,7 +2,7 @@
 // Every member's app posts here with the shared passphrase. No sheet ID, URL or passphrase
 // lives in this file; the passphrase is kept in the script properties (menu: Set passphrase).
 
-var VERSION = 1;
+var VERSION = 2;
 var GAMES = 'Games';
 var THROWS = 'Throws';
 var GAMES_HEAD = ['MatchID', 'DeviceID', 'Recorder', 'UpdatedAt', 'DeletedAt', 'Json'];
@@ -71,6 +71,8 @@ function handle(req, ss, now) {
     var id = req.match.id;
     var found = findGame(games, id);
     if (found && found.values[1] !== req.deviceId) return { ok: false, error: 'not-owner' };
+    // Deleted on the sheet (possibly by a teammate): the recording phone must not bring it back.
+    if (found && found.values[4]) return { ok: false, error: 'deleted' };
     var body = JSON.stringify(req.match);
     if (body.length > MAX_JSON) return { ok: false, error: 'too-large' };
     var row = [id, req.deviceId, req.recorder || '', stamp, '', body];
@@ -89,9 +91,11 @@ function handle(req, ss, now) {
     if (!isId(req.matchId) || !isId(req.deviceId)) return { ok: false, error: 'bad-request' };
     var game = findGame(games, req.matchId);
     if (!game) return { ok: true };
-    if (game.values[1] !== req.deviceId) return { ok: false, error: 'not-owner' };
-    // Keep the row with DeletedAt so other devices learn about the deletion when they pull.
-    games.getRange(game.index, 1, 1, GAMES_HEAD.length).setValues([[req.matchId, req.deviceId, game.values[2], stamp, stamp, '']]);
+    // Deleting a teammate's match is allowed only when the app confirmed it with the user (force).
+    if (game.values[1] !== req.deviceId && req.force !== true) return { ok: false, error: 'not-owner' };
+    // Keep the row (and its Json, so a mistaken deletion can be undone by clearing DeletedAt) so every
+    // device learns about the deletion when it pulls. The recording phone stays the owner.
+    games.getRange(game.index, 1, 1, GAMES_HEAD.length).setValues([[req.matchId, game.values[1], game.values[2], stamp, stamp, game.values[5]]]);
     removeRows(throws, req.matchId);
     return { ok: true };
   }

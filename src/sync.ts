@@ -14,10 +14,12 @@ export interface SyncSettings {
   auto: boolean;
 }
 
-/** Matches to send (by id) and matches to delete on the sheet. */
+/** Matches to send (by id), own matches to delete, and teammates' matches the user chose to delete. */
 export interface SyncQueue {
   put: string[];
   del: string[];
+  /** Missing in queues saved before teammates' matches could be deleted. */
+  delOthers?: string[];
 }
 
 export interface SyncStatus {
@@ -38,7 +40,8 @@ const STATUS_KEY = 'molkky-sync-status-v1';
 const REMOTE_KEY = 'molkky-remote-v1';
 
 export const URL_RE = /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/;
-export const emptyQueue = (): SyncQueue => ({ put: [], del: [] });
+export const emptyQueue = (): SyncQueue => ({ put: [], del: [], delOthers: [] });
+export const pendingCount = (q: SyncQueue) => q.put.length + q.del.length + (q.delOthers?.length ?? 0);
 export const newSettings = (): SyncSettings => ({ url: '', token: '', deviceId: uid(), recorder: '', auto: true });
 export const isConfigured = (s: SyncSettings | null): s is SyncSettings => !!s && URL_RE.test(s.url) && !!s.token;
 
@@ -65,6 +68,7 @@ export function queueChanges(q: SyncQueue, prev: Match[], next: Match[]): SyncQu
   const changed = next.filter((m) => before.get(m.id) !== m).map((m) => m.id);
   const removed = prev.filter((m) => !after.has(m.id)).map((m) => m.id);
   return {
+    ...q,
     put: [...new Set([...q.put.filter((id) => !removed.includes(id)), ...changed])],
     del: [...new Set([...q.del.filter((id) => !changed.includes(id)), ...removed])],
   };
@@ -72,8 +76,14 @@ export function queueChanges(q: SyncQueue, prev: Match[], next: Match[]): SyncQu
 
 /** Queues every match on this device, e.g. for the first sync. */
 export const queueAll = (q: SyncQueue, matches: Match[]): SyncQueue => ({
+  ...q,
   put: [...new Set([...q.put, ...matches.map((m) => m.id)])],
-  del: q.del,
+});
+
+/** Queues deleting a teammate's match (already confirmed by the user). */
+export const queueDeleteOther = (q: SyncQueue, id: string): SyncQueue => ({
+  ...q,
+  delOthers: [...new Set([...(q.delOthers ?? []), id])],
 });
 
 export interface Reply {
@@ -103,28 +113,38 @@ export async function call(url: string, body: object, fetchImpl: Fetch = fetch):
 export const ping = (s: SyncSettings, fetchImpl?: Fetch) => call(s.url, { op: 'ping', token: s.token }, fetchImpl);
 
 export interface FlushResult {
-  /** Sent matches with the version that was sent, and deletions that went through. */
+  /** Sent matches with the version that was sent. */
   sent: { id: string; updatedAt?: number }[];
+  /** Own deletions that went through. */
   deleted: string[];
   /** Matches the sheet refused because another device recorded them; they are dropped from the queue. */
   refused: string[];
   /** Queued matches no longer on this device (their deletion is queued separately). */
   dropped: string[];
+  /** Teammates' matches deleted on the sheet. */
+  deletedOthers: string[];
+  /** Teammates' matches the sheet would not delete: its script predates this feature. */
+  forceRefused: string[];
+  /** Own matches that were deleted on the sheet (by a teammate); they should go from this device too. */
+  gone: string[];
   error?: string;
 }
 
+type ListKey = Exclude<keyof FlushResult, 'sent' | 'error'>;
+const emptyResult = (): FlushResult => ({ sent: [], deleted: [], refused: [], dropped: [], deletedOthers: [], forceRefused: [], gone: [] });
+
 /**
- * Sends the queue in order: deletions, then matches. Stops at the first failure other than
- * 'not-owner' (a network or passphrase problem would fail every request anyway).
+ * Sends the queue in order: own deletions, teammates' deletions, then matches. Stops at the first
+ * failure that would fail every request anyway (network, passphrase).
  * onStep reports each finished item right away, so progress survives the app being closed mid-way.
  */
 export async function flush(
   s: SyncSettings, q: SyncQueue, matches: Match[], fetchImpl?: Fetch, onStep?: (done: FlushResult) => void,
 ): Promise<FlushResult> {
-  const out: FlushResult = { sent: [], deleted: [], refused: [], dropped: [] };
-  const step = (key: 'deleted' | 'refused' | 'dropped', id: string) => {
+  const out = emptyResult();
+  const step = (key: ListKey, id: string) => {
     out[key].push(id);
-    onStep?.({ sent: [], deleted: [], refused: [], dropped: [], [key]: [id] });
+    onStep?.({ ...emptyResult(), [key]: [id] });
   };
   const base = { token: s.token, deviceId: s.deviceId };
   for (const id of q.del) {
@@ -133,14 +153,21 @@ export async function flush(
     else if (r.error === 'not-owner') step('refused', id);
     else return { ...out, error: r.error };
   }
+  for (const id of q.delOthers ?? []) {
+    const r = await call(s.url, { ...base, op: 'deleteMatch', matchId: id, force: true }, fetchImpl);
+    if (r.ok) step('deletedOthers', id);
+    else if (r.error === 'not-owner') step('forceRefused', id);
+    else return { ...out, error: r.error };
+  }
   for (const id of q.put) {
     const m = matches.find((x) => x.id === id);
     if (!m) { step('dropped', id); continue; }
     const r = await call(s.url, { ...base, op: 'putMatch', recorder: s.recorder, match: m, rows: rowsForMatch(m) }, fetchImpl);
     if (r.ok) {
       out.sent.push({ id, updatedAt: m.updatedAt });
-      onStep?.({ sent: [{ id, updatedAt: m.updatedAt }], deleted: [], refused: [], dropped: [] });
+      onStep?.({ ...emptyResult(), sent: [{ id, updatedAt: m.updatedAt }] });
     } else if (r.error === 'not-owner') step('refused', id);
+    else if (r.error === 'deleted') step('gone', id);
     else return { ...out, error: r.error };
   }
   return out;
@@ -156,9 +183,15 @@ export function afterFlush(q: SyncQueue, r: FlushResult, matches: Match[]): Sync
     ...r.sent.filter((x) => current.get(x.id) === x.updatedAt).map((x) => x.id),
     ...r.refused,
     ...r.dropped,
+    ...r.gone,
   ]);
   const deleted = new Set([...r.deleted.filter((id) => !current.has(id)), ...r.refused]);
-  return { put: q.put.filter((id) => !done.has(id)), del: q.del.filter((id) => !deleted.has(id)) };
+  const others = new Set([...r.deletedOthers, ...r.forceRefused]);
+  return {
+    put: q.put.filter((id) => !done.has(id)),
+    del: q.del.filter((id) => !deleted.has(id)),
+    delOthers: (q.delOthers ?? []).filter((id) => !others.has(id)),
+  };
 }
 
 /** Minimal shape check so a malformed row on the sheet cannot break the app. */
@@ -182,11 +215,36 @@ export function fromPull(games: unknown, myDeviceId: string): RemoteGame[] | nul
   });
 }
 
-export async function pull(s: SyncSettings, fetchImpl?: Fetch): Promise<{ games?: RemoteGame[]; error?: string }> {
+/** This device's own matches that were deleted on the sheet, e.g. by a teammate. */
+export function ownDeleted(games: unknown, myDeviceId: string): string[] {
+  if (!Array.isArray(games)) return [];
+  return games.flatMap((g) => {
+    const x = g as { matchId?: unknown; deviceId?: unknown; deletedAt?: unknown };
+    return x.deviceId === myDeviceId && x.deletedAt && typeof x.matchId === 'string' ? [x.matchId] : [];
+  });
+}
+
+/** This device's own matches that are live on the sheet (used to restore ones undeleted there). */
+export function ownLive(games: unknown, myDeviceId: string): Match[] {
+  if (!Array.isArray(games)) return [];
+  return games.flatMap((g) => {
+    const x = g as { deviceId?: unknown; deletedAt?: unknown; match?: unknown };
+    return x.deviceId === myDeviceId && !x.deletedAt && isMatch(x.match) ? [x.match] : [];
+  });
+}
+
+export interface PullResult {
+  games?: RemoteGame[];
+  ownDeleted?: string[];
+  ownLive?: Match[];
+  error?: string;
+}
+
+export async function pull(s: SyncSettings, fetchImpl?: Fetch): Promise<PullResult> {
   const r = await call(s.url, { op: 'pull', token: s.token }, fetchImpl);
   if (!r.ok) return { error: r.error };
   const games = fromPull(r.games, s.deviceId);
-  return games ? { games } : { error: 'bad-response' };
+  return games ? { games, ownDeleted: ownDeleted(r.games, s.deviceId), ownLive: ownLive(r.games, s.deviceId) } : { error: 'bad-response' };
 }
 
 /** User-facing text for an error code from the web app or the network. */
@@ -196,6 +254,7 @@ export function errorText(code: string | undefined): string {
     case 'network': return 'No connection. Will retry.';
     case 'bad-response': return 'Unexpected reply. Check the web app URL and that it is deployed for "Anyone".';
     case 'not-owner': return 'A match was recorded on another device and was skipped.';
+    case 'force-refused': return "Deleting a teammate's match needs the updated sheet script (see the setup guide).";
     case 'too-large': return 'A match is too large for one sheet cell.';
     case undefined: return '';
     default: return `Sync failed (${code}).`;

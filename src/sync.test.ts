@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { rowsForMatch, toCsv, type Match } from './store';
-import { afterFlush, call, flush, fromPull, pull, queueAll, queueChanges, URL_RE, type SyncSettings } from './sync';
+import { afterFlush, call, flush, fromPull, ownDeleted, ownLive, pull, queueAll, queueChanges, queueDeleteOther, URL_RE, type SyncSettings } from './sync';
 
 const match = (id: string, updatedAt = 1): Match => ({
   id, date: '2026-09-21', tournament: 'Nara Open', opponent: 'Kanto', kind: 'tournament', updatedAt,
@@ -91,20 +91,20 @@ describe('flush', () => {
     const f = fakeFetch([{ ok: false, error: 'unauthorized' }]);
     const r = await flush(settings, { put: ['a', 'b'], del: [] }, [match('a'), match('b')], f.fn);
     expect(r.error).toBe('unauthorized');
-    expect(afterFlush({ put: ['a', 'b'], del: [] }, r, [match('a'), match('b')])).toEqual({ put: ['a', 'b'], del: [] });
+    expect(afterFlush({ put: ['a', 'b'], del: [] }, r, [match('a'), match('b')])).toEqual({ put: ['a', 'b'], del: [], delOthers: [] });
   });
 
   it('drops matches another device owns and carries on', async () => {
     const f = fakeFetch([{ ok: false, error: 'not-owner' }, { ok: true }]);
     const r = await flush(settings, { put: ['a', 'b'], del: [] }, [match('a'), match('b')], f.fn);
     expect(r).toMatchObject({ refused: ['a'], sent: [{ id: 'b' }] });
-    expect(afterFlush({ put: ['a', 'b'], del: [] }, r, [match('a'), match('b')])).toEqual({ put: [], del: [] });
+    expect(afterFlush({ put: ['a', 'b'], del: [] }, r, [match('a'), match('b')])).toEqual({ put: [], del: [], delOthers: [] });
   });
 
   it('keeps a match queued when it changed while being sent', () => {
-    const r = { sent: [{ id: 'a', updatedAt: 1 }], deleted: [], refused: [], dropped: [] };
-    expect(afterFlush({ put: ['a'], del: [] }, r, [match('a', 2)])).toEqual({ put: ['a'], del: [] });
-    expect(afterFlush({ put: ['a'], del: [] }, r, [match('a', 1)])).toEqual({ put: [], del: [] });
+    const r = { sent: [{ id: 'a', updatedAt: 1 }], deleted: [], refused: [], dropped: [], deletedOthers: [], forceRefused: [], gone: [] };
+    expect(afterFlush({ put: ['a'], del: [] }, r, [match('a', 2)])).toEqual({ put: ['a'], del: [], delOthers: [] });
+    expect(afterFlush({ put: ['a'], del: [] }, r, [match('a', 1)])).toEqual({ put: [], del: [], delOthers: [] });
   });
 
   it('reports each finished item as it goes, so an interrupted send keeps its progress', async () => {
@@ -113,12 +113,12 @@ describe('flush', () => {
     const f = fakeFetch([{ ok: true }, { ok: true }, { ok: true }, new TypeError('offline')]);
     const r = await flush(settings, q, matches, f.fn, (done) => { q = afterFlush(q, done, matches); });
     expect(r.error).toBe('network');
-    expect(q).toEqual({ put: ['c'], del: [] });
+    expect(q).toEqual({ put: ['c'], del: [], delOthers: [] });
   });
 
   it('drops queued matches that no longer exist', async () => {
     const r = await flush(settings, { put: ['gone'], del: [] }, [], fakeFetch([]).fn);
-    expect(afterFlush({ put: ['gone'], del: [] }, r, [])).toEqual({ put: [], del: [] });
+    expect(afterFlush({ put: ['gone'], del: [] }, r, [])).toEqual({ put: [], del: [], delOthers: [] });
   });
 });
 
@@ -144,9 +144,54 @@ describe('pull', () => {
 
   it('asks the web app for every game', async () => {
     const f = fakeFetch([{ ok: true, games: [{ deviceId: 'dev2', recorder: 'Ken', deletedAt: '', match: match('b') }] }]);
-    expect(await pull(settings, f.fn)).toEqual({ games: [{ match: match('b'), deviceId: 'dev2', recorder: 'Ken' }] });
+    expect(await pull(settings, f.fn)).toEqual({ games: [{ match: match('b'), deviceId: 'dev2', recorder: 'Ken' }], ownDeleted: [], ownLive: [] });
     expect(f.bodies[0]).toEqual({ op: 'pull', token: 'secret' });
     expect(await pull(settings, fakeFetch([{ ok: false, error: 'unauthorized' }]).fn)).toEqual({ error: 'unauthorized' });
     expect(await pull(settings, fakeFetch([{ ok: true }]).fn)).toEqual({ error: 'bad-response' });
+  });
+});
+
+describe("deleting teammates' matches", () => {
+  it('sends a forced delete and clears it from the queue', async () => {
+    const f = fakeFetch([{ ok: true }]);
+    const q = queueDeleteOther({ put: [], del: [] }, 'x');
+    const r = await flush(settings, q, [], f.fn);
+    expect(f.bodies[0]).toMatchObject({ op: 'deleteMatch', matchId: 'x', deviceId: 'dev1', force: true });
+    expect(r.deletedOthers).toEqual(['x']);
+    expect(afterFlush(q, r, [])).toEqual({ put: [], del: [], delOthers: [] });
+  });
+
+  it('reports a sheet script too old to allow it', async () => {
+    const r = await flush(settings, { put: [], del: [], delOthers: ['x'] }, [], fakeFetch([{ ok: false, error: 'not-owner' }]).fn);
+    expect(r.forceRefused).toEqual(['x']);
+  });
+
+  it('an own match deleted on the sheet is reported as gone', async () => {
+    const r = await flush(settings, { put: ['a'], del: [] }, [match('a')], fakeFetch([{ ok: false, error: 'deleted' }]).fn);
+    expect(r.gone).toEqual(['a']);
+    expect(afterFlush({ put: ['a'], del: [] }, r, [match('a')])).toEqual({ put: [], del: [], delOthers: [] });
+  });
+
+  it('a pull lists own matches deleted by teammates', () => {
+    const games = [
+      { matchId: 'a', deviceId: 'dev1', deletedAt: '2026-09-27T10:00:00Z', match: null },
+      { matchId: 'b', deviceId: 'dev1', deletedAt: '', match: match('b') },
+      { matchId: 'c', deviceId: 'dev2', deletedAt: '2026-09-27T10:00:00Z', match: null },
+    ];
+    expect(ownDeleted(games, 'dev1')).toEqual(['a']);
+  });
+
+  it('a pull lists own live matches, for restoring ones undeleted on the sheet', () => {
+    const games = [
+      { matchId: 'a', deviceId: 'dev1', deletedAt: '', match: match('a') },
+      { matchId: 'b', deviceId: 'dev1', deletedAt: '2026-09-27T10:00:00Z', match: match('b') },
+      { matchId: 'c', deviceId: 'dev2', deletedAt: '', match: match('c') },
+    ];
+    expect(ownLive(games, 'dev1').map((m) => m.id)).toEqual(['a']);
+  });
+
+  it('queue changes keep pending teammate deletions', () => {
+    const q = queueChanges({ put: [], del: [], delOthers: ['x'] }, [], [match('a')]);
+    expect(q).toEqual({ put: ['a'], del: [], delOthers: ['x'] });
   });
 });

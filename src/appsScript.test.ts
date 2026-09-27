@@ -56,7 +56,7 @@ describe('Code.gs', () => {
   });
 
   it('ping answers without touching the sheets', () => {
-    expect(gs.handle({ op: 'ping' }, ss, now)).toEqual({ ok: true, version: 1 });
+    expect(gs.handle({ op: 'ping' }, ss, now)).toEqual({ ok: true, version: 2 });
     expect(Object.keys(ss.sheets)).toEqual([]);
   });
 
@@ -78,11 +78,23 @@ describe('Code.gs', () => {
     expect(throwsFor('m1')[0][13]).toBe(5);
   });
 
+  it('a teammate may delete a match only when forced, and the owner cannot bring it back', () => {
+    gs.handle(put(match('m1', [5, 1])), ss, now);
+    expect(gs.handle({ op: 'deleteMatch', matchId: 'm1', deviceId: 'dev2', force: true }, ss, now)).toEqual({ ok: true });
+    expect(throwsFor('m1')).toHaveLength(0);
+    // Still owned by dev1, so dev1 sees the deletion in its own games when it pulls.
+    expect(ss.sheets.Games.rows[1].slice(0, 2)).toEqual(['m1', 'dev1']);
+    expect(ss.sheets.Games.rows[1][4]).toBe(now.toISOString());
+    expect(gs.handle(put(match('m1', [5, 1, 7])), ss, now)).toEqual({ ok: false, error: 'deleted' });
+  });
+
   it('deleteMatch removes the throws and leaves a marker for other devices', () => {
     gs.handle(put(match('m1', [5, 1])), ss, now);
     expect(gs.handle({ op: 'deleteMatch', matchId: 'm1', deviceId: 'dev1' }, ss, now)).toEqual({ ok: true });
     expect(throwsFor('m1')).toHaveLength(0);
-    expect(ss.sheets.Games.rows[1]).toEqual(['m1', 'dev1', 'Aki', now.toISOString(), now.toISOString(), '']);
+    expect(ss.sheets.Games.rows[1].slice(0, 5)).toEqual(['m1', 'dev1', 'Aki', now.toISOString(), now.toISOString()]);
+    // The match data stays, so the deletion can be undone by clearing DeletedAt.
+    expect(JSON.parse(String(ss.sheets.Games.rows[1][5])).id).toBe('m1');
     expect(gs.handle({ op: 'deleteMatch', matchId: 'unknown', deviceId: 'dev1' }, ss, now)).toEqual({ ok: true });
   });
 
@@ -111,7 +123,7 @@ describe('Code.gs', () => {
     gs.handle({ op: 'deleteMatch', matchId: 'm1', deviceId: 'dev1' }, ss, now);
     const r = gs.handle({ op: 'pull' }, ss, now) as { games: { matchId: string; deviceId: string; deletedAt: string; match: Match | null }[] };
     expect(r.games.map((g) => [g.matchId, g.deviceId, !!g.deletedAt, g.match?.id ?? null])).toEqual([
-      ['m1', 'dev1', true, null],
+      ['m1', 'dev1', true, 'm1'],
       ['m2', 'dev2', false, 'm2'],
     ]);
   });
