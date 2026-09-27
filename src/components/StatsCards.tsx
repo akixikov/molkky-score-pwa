@@ -2,7 +2,7 @@
 import { avgOf, finishers, hitOf, pct, throwsOf } from '../stats';
 import { type SetEntry } from '../store';
 
-export function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="stat">
       <div className="muted tiny">{label}</div>

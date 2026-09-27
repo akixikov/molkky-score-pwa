@@ -17,7 +17,7 @@ export interface Sync {
   sendAll: () => void;
 }
 
-export const PULL_EVERY_MS = 60_000;
+const PULL_EVERY_MS = 60_000;
 
 /**
  * Keeps the unsent queue and sends it to the team spreadsheet, then pulls teammates' matches:

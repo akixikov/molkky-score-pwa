@@ -4,7 +4,7 @@ import { deriveSet, type DerivedThrow, type SideId } from '../rules';
 import { setWinner, type SetEntry } from '../store';
 import { type Names, dqNames, sideClass } from '../ui';
 
-export function endLabel(s: SetEntry, names: Names): string {
+function endLabel(s: SetEntry, names: Names): string {
   const st = deriveSet(s.config, s.records);
   if (s.manualWinner) return 'Manual';
   if (st.endReason === 'finish') return 'Reached 50';

@@ -24,7 +24,7 @@ export function Scoreboard({ state, current, names }: { state: SetState; current
   );
 }
 
-export function Hints({ state, team }: { state: SetState; team: SideId }) {
+function Hints({ state, team }: { state: SetState; team: SideId }) {
   const hints = hintsFor(state, team);
   if (hints.length === 0) return null;
   return (

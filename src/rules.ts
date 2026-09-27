@@ -87,13 +87,6 @@ export interface SetState {
   rows: DerivedThrow[];
 }
 
-/** Score from knocked pins: one pin scores its number, two or more score the count. */
-export function scoreOf(pins: number[]): number {
-  if (pins.length === 0) return 0;
-  if (pins.length === 1) return pins[0];
-  return pins.length;
-}
-
 /** Apply one throw to a team score. */
 export function applyThrow(before: number, score: number): { after: number; event: ThrowEvent } {
   const total = before + score;

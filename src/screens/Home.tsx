@@ -6,7 +6,7 @@ import { isConfigured } from '../sync';
 import { today, isPracticeGame, teamNames, type Update, type Go } from '../ui';
 import { type Sync, syncSummary } from '../useTeamSync';
 
-export const EXPANDED_KEY = 'molkky-expanded-groups';
+const EXPANDED_KEY = 'molkky-expanded-groups';
 
 export function Home({ data, all, update, go, sync }: { data: AppData; all: Match[]; update: Update; go: Go; sync: Sync }) {
   const [armed, setArmed] = useState<string | null>(null);

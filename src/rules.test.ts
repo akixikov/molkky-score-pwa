@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyThrow, deriveSet, hintsFor, scoreOf, sidesOf, type SetConfig, type ThrowRecord } from './rules';
+import { applyThrow, deriveSet, hintsFor, sidesOf, type SetConfig, type ThrowRecord } from './rules';
 
 let seq = 0;
 const t = (team: string, score: number, player?: string): ThrowRecord => ({
@@ -8,12 +8,6 @@ const t = (team: string, score: number, player?: string): ThrowRecord => ({
   player,
   score,
   ts: seq,
-});
-
-describe('scoreOf', () => {
-  it('one pin scores its number', () => expect(scoreOf([12])).toBe(12));
-  it('two or more pins score the count', () => expect(scoreOf([10, 11, 12])).toBe(3));
-  it('no pins is a miss', () => expect(scoreOf([])).toBe(0));
 });
 
 describe('applyThrow', () => {

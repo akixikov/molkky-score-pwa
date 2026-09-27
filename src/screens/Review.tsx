@@ -6,19 +6,19 @@ import { tournamentKey, type Match } from '../store';
 import { type Go } from '../ui';
 import { SERIES_COLORS, TEAM_COLOR, TrendChart } from '../components/TrendChart';
 
-export const kpiFmt = (k: Kpi, v: number, digits = 0) => (k.num ? (Number.isNaN(v) ? '—' : v.toFixed(1)) : pct(v, digits));
+const kpiFmt = (k: Kpi, v: number, digits = 0) => (k.num ? (Number.isNaN(v) ? '—' : v.toFixed(1)) : pct(v, digits));
 
 /** A player is flagged when this far from the team, on at least MIN_N throws. */
-export const kpiGap = (k: Kpi) => (k.num ? 0.5 : 0.05);
+const kpiGap = (k: Kpi) => (k.num ? 0.5 : 0.05);
 
-export const MIN_N = 5;
+const MIN_N = 5;
 
 /**
  * Review of tournaments and practice alike: pick the team and any players once; the KPI table and
  * the trend both follow. Each tournament or practice session is one point in time.
  * ▼ marks where a player is clearly below the team — the individual's focus.
  */
-export function ReviewBody({ matches }: { matches: Match[] }) {
+function ReviewBody({ matches }: { matches: Match[] }) {
   const [period, setPeriod] = useState<string>('');
   const [showTeam, setShowTeam] = useState(true);
   const [picked, setPicked] = useState<{ name: string; slot: number }[]>([]);

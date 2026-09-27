@@ -5,7 +5,7 @@ import { uid, type AppData, type Match } from '../store';
 import { today, isPracticeGame, type Update, type Go } from '../ui';
 import { RosterChips, MemberInput, LineupEditor } from '../components/Lineup';
 
-export const MAX_TEAMS = 3;
+const MAX_TEAMS = 3;
 
 /** Practice game with every player recorded: individual (one player per side) or teams. */
 export function PracticeSetup({ data, update, go }: { data: AppData; update: Update; go: Go }) {

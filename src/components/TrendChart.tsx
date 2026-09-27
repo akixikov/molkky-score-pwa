@@ -10,8 +10,8 @@ export const TEAM_COLOR = '#3d3c39';
 export interface TrendSeries { name: string; color: string; dashed?: boolean; values: number[] }
 
 /**
- * One measure across tournaments, oldest on the left, one line per series.
- * Tap a point to read every series at that tournament; the latest is shown by default.
+ * One measure across dates (tournaments and practice days), oldest on the left, one line per series.
+ * Nothing is highlighted until a point is tapped; then every series is read out for that date.
  */
 export function TrendChart({ title, labels, hollow, series, fmt, tick, domain, sel, onSelect }: {
   title: string; labels: string[]; series: TrendSeries[];
