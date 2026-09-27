@@ -1,8 +1,21 @@
 // Mölkky rules engine.
-// Records hold only facts (who threw, which pins fell). Scores, bursts,
+// Records hold only facts (who threw, the score of each throw). Totals, bursts,
 // finishes and eliminations are always derived here, never stored.
 
+/** The two sides of a tournament game. */
 export type Team = 'us' | 'them';
+/** Any side of a game: 'us' / 'them' in tournaments, 's1'… in practice games. */
+export type SideId = string;
+
+/** A side and its throwing order. Practice games list every side; tournament games derive theirs. */
+export interface Side {
+  id: SideId;
+  name: string;
+  lineup: string[];
+}
+
+/** Practice games allow up to this many players in total. */
+export const MAX_PRACTICE_PLAYERS = 6;
 
 export const WIN_SCORE = 50;
 export const BURST_RESET = 25;
@@ -18,20 +31,23 @@ export const PIN_ROWS: number[][] = [
 
 export interface ThrowRecord {
   id: string;
-  team: Team;
-  /** Our team's thrower. Empty for the opponent. */
+  team: SideId;
+  /** Thrower. Empty when unknown (tournament opponents). */
   player?: string;
-  /** Pins knocked down (our team). Undefined when only the score is known. */
+  /** Pins knocked down. Only in older records; new records store the score only. */
   pins?: number[];
-  /** Score entered directly (opponent) or derived from pins (our team). */
+  /** Score of this throw (0 = miss). */
   score: number;
   ts: number;
 }
 
 export interface SetConfig {
-  firstTeam: Team;
-  /** Our throwing order. */
+  /** Side that throws first. */
+  firstTeam: SideId;
+  /** Our throwing order (tournament games). */
   lineup: string[];
+  /** Practice games: every side, in setup order. Absent in tournament games (us vs them). */
+  sides?: Side[];
 }
 
 export type ThrowEvent = '' | 'Miss' | 'Finish' | 'Over' | 'Eliminated';
@@ -55,15 +71,18 @@ export interface TeamState {
   eliminated: boolean;
 }
 
+/** 'opponent-eliminated': every other side was disqualified. */
 export type EndReason = 'finish' | 'opponent-eliminated' | null;
 
 export interface SetState {
-  teams: Record<Team, TeamState>;
-  winner: Team | null;
+  /** Sides in throwing order, starting with the first side. */
+  order: Side[];
+  teams: Record<SideId, TeamState>;
+  winner: SideId | null;
   endReason: EndReason;
-  /** Team to throw next, or null when the set has ended. */
-  nextTeam: Team | null;
-  /** Our next thrower (by lineup), when it is our turn. */
+  /** Side to throw next, or null when the set has ended. */
+  nextTeam: SideId | null;
+  /** Next thrower of that side (by lineup), when the side has a lineup. */
   nextPlayer: string | null;
   rows: DerivedThrow[];
 }
@@ -87,18 +106,28 @@ export function other(team: Team): Team {
   return team === 'us' ? 'them' : 'us';
 }
 
+/** Sides of a game in throwing order, first side first. */
+export function sidesOf(config: SetConfig): Side[] {
+  const all = config.sides ?? [
+    { id: 'us', name: 'Us', lineup: config.lineup },
+    { id: 'them', name: 'Them', lineup: [] },
+  ];
+  const i = Math.max(0, all.findIndex((s) => s.id === config.firstTeam));
+  return [...all.slice(i), ...all.slice(0, i)];
+}
+
+const freshTeam = (): TeamState => ({ score: 0, faultStreak: 0, throws: 0, eliminated: false });
+
 /** Derive the full state of a set from its records. */
 export function deriveSet(config: SetConfig, records: ThrowRecord[]): SetState {
-  const teams: Record<Team, TeamState> = {
-    us: { score: 0, faultStreak: 0, throws: 0, eliminated: false },
-    them: { score: 0, faultStreak: 0, throws: 0, eliminated: false },
-  };
+  const order = sidesOf(config);
+  const teams: Record<SideId, TeamState> = Object.fromEntries(order.map((s) => [s.id, freshTeam()]));
   const rows: DerivedThrow[] = [];
-  let winner: Team | null = null;
+  let winner: SideId | null = null;
   let endReason: EndReason = null;
 
   for (const rec of records) {
-    const t = teams[rec.team];
+    const t = (teams[rec.team] ??= freshTeam());
     const before = t.score;
     const streakBefore = t.faultStreak;
     let { after, event } = applyThrow(before, rec.score);
@@ -122,23 +151,30 @@ export function deriveSet(config: SetConfig, records: ThrowRecord[]): SetState {
       winner = rec.team;
       endReason = 'finish';
     } else if (event === 'Eliminated') {
-      winner = other(rec.team);
-      endReason = 'opponent-eliminated';
+      // The game goes on until only one side is left.
+      const alive = order.filter((s) => !teams[s.id].eliminated);
+      if (alive.length === 1) {
+        winner = alive[0].id;
+        endReason = 'opponent-eliminated';
+      }
     }
     if (winner) break;
   }
 
-  let nextTeam: Team | null = null;
+  // Next side: the one after the last thrower in order, skipping disqualified sides.
+  let nextTeam: SideId | null = null;
   if (!winner) {
     const last = records[records.length - 1];
-    nextTeam = last ? other(last.team) : config.firstTeam;
+    const from = last ? order.findIndex((s) => s.id === last.team) : -1;
+    for (let k = 1; k <= order.length; k++) {
+      const cand = order[(from + k + order.length) % order.length];
+      if (!teams[cand.id].eliminated) { nextTeam = cand.id; break; }
+    }
   }
-  const nextPlayer =
-    nextTeam === 'us' && config.lineup.length > 0
-      ? config.lineup[teams.us.throws % config.lineup.length]
-      : null;
+  const lineup = order.find((s) => s.id === nextTeam)?.lineup ?? [];
+  const nextPlayer = nextTeam && lineup.length > 0 ? lineup[teams[nextTeam].throws % lineup.length] : null;
 
-  return { teams, winner, endReason, nextTeam, nextPlayer, rows };
+  return { order, teams, winner, endReason, nextTeam, nextPlayer, rows };
 }
 
 export interface Hint {
@@ -148,32 +184,33 @@ export interface Hint {
 }
 
 /** Strategy prompts for the thrower, based on the team analysis. */
-export function hintsFor(state: SetState, team: Team): Hint[] {
+export function hintsFor(state: SetState, team: SideId): Hint[] {
   const t = state.teams[team];
-  const opp = state.teams[other(team)];
+  // The closest rival still in the game.
+  const opp = { score: Math.max(0, ...state.order.filter((s) => s.id !== team && !state.teams[s.id].eliminated).map((s) => state.teams[s.id].score)) };
   const hints: Hint[] = [];
   const remaining = WIN_SCORE - t.score;
 
   if (t.faultStreak === 2) {
-    hints.push({ level: 'danger', title: '2ミス中：失格の危機', body: '確実に1本倒す。近いピン・2本倒しだけを狙う。' });
+    hints.push({ level: 'danger', title: '2 misses: one more and you are disqualified', body: 'Just knock down a skittle. Aim only at close skittles or an easy pair.' });
   } else if (t.faultStreak === 1) {
-    hints.push({ level: 'warn', title: '1ミス中：崖っぷちモード', body: '近いピン・2本倒し・当てやすいピンだけを狙う。狙いを声に出してから投げる。' });
+    hints.push({ level: 'warn', title: '1 miss: play it safe', body: 'Aim only at close skittles, an easy pair, or easy targets. Say your target out loud before throwing.' });
   }
 
   if (t.score < 41) {
     const lo = Math.max(1, 41 - t.score);
     const hi = Math.min(12, 45 - t.score);
     if (lo <= 12) {
-      hints.push({ level: 'info', title: '狙いの目安', body: `${lo}〜${hi}点で41〜45点（残り5〜9点）に入る。` });
+      hints.push({ level: 'info', title: 'Target', body: `Scoring ${lo}–${hi} puts you on 41–45 (5–9 to go).` });
     }
   } else if (remaining === 1) {
-    hints.push({ level: 'warn', title: '残り1点', body: '1番を1本だけ倒す。2本以上はバースト。' });
+    hints.push({ level: 'warn', title: '1 to go', body: 'Knock down skittle 1 alone. Two or more takes you over 50 and back to 25.' });
   } else if (remaining <= 12) {
-    hints.push({ level: 'info', title: `残り${remaining}点`, body: `${remaining}番を1本、または${remaining}本まとめて倒す。` });
+    hints.push({ level: 'info', title: `${remaining} to go`, body: `Knock down skittle ${remaining} alone, or ${remaining} skittles together.` });
   }
 
   if (opp.score >= 38 && opp.score < WIN_SCORE) {
-    hints.push({ level: 'info', title: `相手は残り${WIN_SCORE - opp.score}点`, body: '点が取れない場面では、相手の上がりピンを遠くへ押しやるか、固まりに寄せる。' });
+    hints.push({ level: 'info', title: `Opponent needs ${WIN_SCORE - opp.score}`, body: 'If you cannot score, push their finishing skittle far away or into a cluster.' });
   }
   return hints;
 }

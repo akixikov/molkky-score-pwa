@@ -2,7 +2,7 @@
   padding: max(16px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom)); }
 .head { display: flex; flex-direction: column; gap: 4px; }
 h1 { margin: 0; font-size: 22px; font-weight: 700; }
-.h2 { font-size: 20px; font-weight: 700; }
+.h2 { font-size: 20px; font-weight: 700; line-height: 30px; }
 .sub { font-size: 13px; color: var(--muted); }
 .muted { color: var(--muted); font-size: 13px; }
 .tiny { font-size: 12px; }
@@ -55,7 +55,7 @@ select { width: auto; }
 .chip { min-height: 36px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--btnline); background: var(--soft); font-size: 14px; }
 
 .score { display: flex; flex-direction: column; gap: 2px; }
-.score .label { font-size: 13px; font-weight: 700; }
+.score .label { font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .score.us .label { color: var(--accent); }
 .score.them .label { color: var(--opp); }
 .score.active.us { border: 2px solid var(--accent); }
@@ -70,12 +70,15 @@ select { width: auto; }
 .hint.warn { background: var(--warn-bg); color: #6B3A17; }
 .hint.danger { background: var(--warn); color: #fff; }
 
-.pins { display: flex; flex-direction: column; gap: 8px; align-items: center; }
-.pinrow { display: flex; gap: 10px; }
-.pin { width: 58px; height: 58px; border-radius: 29px; border: 1.5px solid var(--btnline); background: #FFFDF8;
+.pins { --pin: 52px; --pgap: 8px; display: flex; flex-direction: column; gap: var(--pgap); align-items: center; }
+.pinrow { display: flex; gap: var(--pgap); position: relative; }
+.pin { width: var(--pin); height: var(--pin); border-radius: 50%; border: 1.5px solid var(--btnline); background: #FFFDF8;
   font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 600; min-height: 0; }
-.pin.on { background: var(--accent); border-color: var(--accent); color: #fff; }
-.preview { display: flex; justify-content: space-between; align-items: center; background: var(--soft); }
+.pin:active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pin.win { border: 2.5px solid var(--accent); color: var(--accent); font-weight: 700; }
+.pin.burst { border-color: var(--warn); color: var(--warn); border-style: dashed; }
+/* Outside the setup: 0 sits one pin-width left of pin 1, undo left of the back row. */
+.pin.miss { position: absolute; right: calc(100% + var(--pin) + 2 * var(--pgap)); border-color: var(--warn); color: var(--warn); background: var(--warn-bg); }
 
 .result { background: var(--accent); color: #fff; border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
 .result.lose { background: var(--opp); }
@@ -90,3 +93,51 @@ select { width: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 500; padding: 4px 2px; }
 td { padding: 6px 2px; border-top: 1px solid #EFEAE0; }
+/* Left edge aligned with the 0 pin (back row is half a pin wider per side than the front row). */
+.undo { position: absolute; right: calc(100% + var(--pin) / 2 + 1.5 * var(--pgap)); width: var(--pin); height: var(--pin); min-height: 0; border-radius: 50%;
+  display: grid; place-items: center; background: #fff; border: 1.5px solid var(--btnline); color: var(--accent); }
+/* Same height with or without the player select, so the pad doesn't shift between turns. */
+.turnhead { min-height: 44px; }
+
+/* Match summary score sheet, styled like a paper scoring form. */
+.sheet { background: #FFFDF8; border: 1.5px solid #2B2B2B; border-radius: 4px; }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1.5px solid #2B2B2B; }
+.sheet-scroll { overflow-x: auto; }
+.sheet table { border-collapse: collapse; font-family: 'Barlow Condensed', 'Zen Kaku Gothic New', sans-serif; font-size: 17px; table-layout: fixed; }
+.sheet th, .sheet td { border: 1px solid #BDB6A6; padding: 3px 4px; text-align: center; height: 28px; }
+.sheet tr > :first-child { border-left: none; }
+.sheet tr > :last-child { border-right: none; }
+.sheet tbody tr:last-child td { border-bottom: 1.5px solid #2B2B2B; }
+.sheet th { font-family: 'Zen Kaku Gothic New', sans-serif; font-size: 11px; color: var(--muted); font-weight: 700; }
+.sheet th.team { font-size: 12px; border-bottom: 1px solid #BDB6A6; }
+.sheet th.team.us { color: var(--accent); }
+.sheet th.team.them { color: var(--opp); }
+.sheet .turn { width: 36px; padding-inline: 2px; color: var(--muted); font-size: 13px; background: #F3EFE6; }
+.sheet th.who { max-width: 56px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink, #2B2B2B); }
+.sheet .idle { background: #F6F2E9; }
+.sheet .tot { font-weight: 700; border-right-width: 1.5px; border-right-color: #2B2B2B; background: #FAF6EC; }
+.sheet .miss { color: var(--warn); font-weight: 700; }
+.sheet .over span, .legend.over { text-decoration: underline wavy var(--warn); text-underline-offset: 3px; }
+.sheet .fin span, .legend.fin { display: inline-block; min-width: 26px; border: 1.5px solid var(--accent); border-radius: 50%; color: var(--accent); line-height: 22px; }
+.legend { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 14px; }
+.sheet tfoot td { font-size: 22px; font-weight: 700; height: 36px; }
+.sheet .final.won { color: var(--accent); }
+.group-head { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: none; border: none; border-bottom: 1.5px solid var(--line);
+  border-radius: 0; padding: 6px 2px; min-height: 52px; color: inherit; font: inherit; }
+.chev { font-size: 22px; line-height: 1; color: var(--muted); transition: transform .15s; width: 14px; }
+.chev.open { transform: rotate(90deg); }
+.group-head .grow { min-width: 0; }
+.group-head .inline { align-items: first baseline; }
+.result-tag { flex-shrink: 1; min-width: 0; font-size: 12px; font-weight: 700; color: var(--accent); background: var(--soft); border-radius: 8px; padding: 2px 8px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Practice sides share the accent colour; disqualified sides fade out. */
+.score.side .label { color: var(--accent); }
+.score.active.side { border: 2px solid var(--accent); }
+.score.out { opacity: .5; }
+.grid3 .score .big-num { font-size: 40px; }
+.sheet th.team.side { color: var(--accent); }
+.finals { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 16px; }
+.score .inline.base { flex-wrap: wrap; column-gap: 6px; row-gap: 0; }
+.score .inline.base .muted { white-space: nowrap; }
+.section-title { margin: 8px 0 0; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.chip.del { border-color: var(--warn); color: var(--warn); background: var(--warn-bg); }
+.link.tiny { font-size: 12px; font-weight: 600; }

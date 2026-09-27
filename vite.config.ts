@@ -11,9 +11,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'モルック記録',
-        short_name: 'モルック',
-        description: 'モルックの投擲を記録して、作戦と振り返りに使うアプリ',
+        name: 'Mölkky Scorer',
+        short_name: 'Mölkky',
+        description: 'Record Mölkky throws for strategy tips and post-match review',
         lang: 'ja',
         theme_color: '#2E6B4E',
         background_color: '#F3EFE6',

@@ -1,7 +1,7 @@
 // Team statistics computed from derived sets.
 // Definitions follow the analysis report and the Kanto Prime League
 // public stats (fault = a throw that scores 0).
-import { deriveSet, type DerivedThrow, type SetConfig, type ThrowRecord, type Team } from './rules';
+import { deriveSet, type DerivedThrow, type SetConfig, type SideId, type ThrowRecord } from './rules';
 
 export interface SetInput {
   config: SetConfig;
@@ -54,11 +54,12 @@ function rate(rows: DerivedThrow[]): Rate {
   return { n, hits, fault: n === 0 ? NaN : (n - hits) / n };
 }
 
-function teamRows(sets: SetInput[], team: Team): DerivedThrow[][] {
-  return sets.map((s) => deriveSet(s.config, s.records).rows.filter((r) => r.team === team));
+/** Rows per set for one side, or for every side when team is null. */
+function teamRows(sets: SetInput[], team: SideId | null): DerivedThrow[][] {
+  return sets.map((s) => deriveSet(s.config, s.records).rows.filter((r) => team === null || r.team === team));
 }
 
-export function teamStats(sets: SetInput[], team: Team = 'us'): TeamStats {
+export function teamStats(sets: SetInput[], team: SideId = 'us'): TeamStats {
   const perSet = teamRows(sets, team).filter((rows) => rows.length > 0);
   const all = perSet.flat();
   const finished = perSet.filter((rows) => rows.some((r) => r.event === 'Finish'));
@@ -79,8 +80,9 @@ export function teamStats(sets: SetInput[], team: Team = 'us'): TeamStats {
   };
 }
 
-export function playerStats(sets: SetInput[]): PlayerStats[] {
-  const rows = teamRows(sets, 'us').flat().filter((r) => r.teamIdx > 1 && r.player);
+/** Per-player stats for one side ('us' by default), or for every side's players when team is null. */
+export function playerStats(sets: SetInput[], team: SideId | null = 'us'): PlayerStats[] {
+  const rows = teamRows(sets, team).flat().filter((r) => r.teamIdx > 1 && r.player);
   const names = [...new Set(rows.map((r) => r.player as string))];
   return names.map((player) => {
     const mine = rows.filter((r) => r.player === player);
