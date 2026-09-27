@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import './App.css';
 import {
   deriveSet, hintsFor, MAX_PRACTICE_PLAYERS, other, PIN_ROWS, WIN_SCORE,
   type DerivedThrow, type SetState, type Side, type SideId, type Team, type ThrowRecord,
 } from './rules';
-import { pct, playerStats, teamStats, type Rate } from './stats';
+import { pct, teamStats } from './stats';
 import {
   download, emptyData, loadData, saveData, setWinner, toCsv, tournamentKey, uid,
   type AppData, type Match, type SetEntry,
@@ -958,36 +958,268 @@ function MatchSummary({ match, update, go }: { match: Match; update: Update; go:
 
 /* ---------------- Review ---------------- */
 
-const GOALS: { key: 'overall' | 'afterOneMiss' | 'throws4to6' | 'over38'; label: string; goal: number }[] = [
-  { key: 'overall', label: 'Overall', goal: 0.19 },
-  { key: 'afterOneMiss', label: 'After 1 miss', goal: 0.22 },
-  { key: 'throws4to6', label: 'Throws 4–6', goal: 0.23 },
-  { key: 'over38', label: 'From 38+', goal: 0.3 },
-];
+/** Player line colours in fixed order (validated palette); a slot is kept while the player stays selected. */
+const SERIES_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'];
+/** The team is a dark dashed reference line, distinct from every player colour. */
+const TEAM_COLOR = '#3d3c39';
 
-function Bar({ label, r, goal }: { label: string; r: Rate; goal: number }) {
-  const w = Number.isNaN(r.fault) ? 0 : Math.min(100, (r.fault / 0.4) * 100);
+interface TrendSeries { name: string; color: string; dashed?: boolean; values: number[] }
+
+/**
+ * One measure across tournaments, oldest on the left, one line per series.
+ * Tap a point to read every series at that tournament; the latest is shown by default.
+ */
+function TrendChart({ title, labels, series, fmt, tick, domain, sel, onSelect }: {
+  title: string; labels: string[]; series: TrendSeries[];
+  fmt: (v: number) => string; tick: (v: number) => string; domain: [number, number];
+  /** Selected tournament index, shared by the charts of one card. */
+  sel: number | null; onSelect: (i: number) => void;
+}) {
+  const W = 320, H = 104, L = 34, R = 10, T = 8, B = 20;
+  const n = labels.length;
+  const x = (i: number) => (n === 1 ? (L + W - R) / 2 : L + (i * (W - L - R)) / (n - 1));
+  const y = (v: number) => T + (1 - (v - domain[0]) / (domain[1] - domain[0])) * (H - T - B);
+  const validOf = (vs: number[]) => vs.map((value, i) => ({ value, i })).filter((p) => !Number.isNaN(p.value));
+  // Missing values (e.g. a player who skipped a tournament) break the line.
+  const pathOf = (v: { i: number; value: number }[]) =>
+    v.map((p, k) => `${k && v[k - 1].i === p.i - 1 ? 'L' : 'M'}${x(p.i)},${y(p.value)}`).join(' ');
+  const shown = sel ?? (n > 0 ? n - 1 : null);
+  const slot = n > 1 ? (W - L - R) / (n - 1) : W - L - R;
   return (
-    <div className="col gap4">
-      <div className="inline between">
-        <span>{label}</span>
-        <span><span className="strong">{pct(r.fault)}</span><span className="muted">  goal {pct(goal, 0)} · {r.n} throws</span></span>
-      </div>
-      <div className="bar"><div className={r.fault > goal ? 'fill warn' : 'fill'} style={{ width: `${w}%` }} /></div>
+    <div className="trend">
+      <div className="strong">{title}</div>
+      {shown !== null && (
+        <div className="readout muted tiny">
+          <span>{labels[shown]}:</span>
+          {series.map((sr) => (
+            <span key={sr.name}>
+              <span className={`swatch ${sr.dashed ? 'dashed' : ''}`} style={{ '--c': sr.color } as CSSProperties} /> {sr.name}{' '}
+              <span className="strong">{Number.isNaN(sr.values[shown]) ? '—' : fmt(sr.values[shown])}</span>
+            </span>
+          ))}
+        </div>
+      )}
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${title} by tournament`}>
+        {[domain[0], (domain[0] + domain[1]) / 2, domain[1]].map((v) => (
+          <g key={v}>
+            <line className="grid" x1={L} x2={W - R} y1={y(v)} y2={y(v)} />
+            <text className="tick" x={L - 6} y={y(v)}>{tick(v)}</text>
+          </g>
+        ))}
+        {series.map((sr) => {
+          const v = validOf(sr.values);
+          return (
+            <g key={sr.name} style={{ '--c': sr.color } as CSSProperties}>
+              <path className={`line ${sr.dashed ? 'dashed' : ''}`} d={pathOf(v)} />
+              {v.map((p) => <circle key={p.i} className="dot" cx={x(p.i)} cy={y(p.value)} r={p.i === shown ? 5 : 3.5} />)}
+            </g>
+          );
+        })}
+        {n > 0 && <text className="xlab" x={x(0)} y={H - 4} textAnchor={n === 1 ? 'middle' : 'start'}>{labels[0]}</text>}
+        {n > 1 && <text className="xlab" x={x(n - 1)} y={H - 4} textAnchor="end">{labels[n - 1]}</text>}
+        {labels.map((_, i) => (
+          <rect key={i} className="hit" x={x(i) - slot / 2} y={0} width={slot} height={H} onClick={() => onSelect(i)} onMouseEnter={() => onSelect(i)} />
+        ))}
+      </svg>
     </div>
+  );
+}
+
+/* ---------------- Review: KPIs for the team and each player ---------------- */
+
+interface KpiValue { v: number; n: number }
+interface Kpi {
+  key: string; label: string; note: string;
+  /** Points per throw rather than a rate. */
+  num?: boolean;
+  pick: (rows: DerivedThrow[]) => KpiValue;
+}
+
+const hitOf = (rows: DerivedThrow[]): KpiValue => ({ v: rows.length === 0 ? NaN : rows.filter((r) => r.score > 0).length / rows.length, n: rows.length });
+
+/** The key numbers, all counted over every throw (first throws included). */
+const KPIS: Kpi[] = [
+  { key: 'hit', label: 'Hit rate', note: 'throws scoring 1+', pick: hitOf },
+  { key: 'afterMiss', label: 'After a miss', note: 'hit rate after 1 miss', pick: (rows) => hitOf(rows.filter((r) => r.faultStreak === 1)) },
+  { key: 'mid', label: 'Mid-game', note: 'hit rate, turns 4–6', pick: (rows) => hitOf(rows.filter((r) => r.teamIdx >= 4 && r.teamIdx <= 6)) },
+  { key: 'zone', label: 'Finishing zone', note: 'hit rate from 38+', pick: (rows) => hitOf(rows.filter((r) => r.before >= 38)) },
+  {
+    key: 'avg', label: 'Avg score', note: 'points per throw', num: true,
+    pick: (rows) => ({ v: rows.length === 0 ? NaN : rows.reduce((a, r) => a + r.score, 0) / rows.length, n: rows.length }),
+  },
+  {
+    key: 'finish', label: 'Finish rate', note: 'exactly 50 ÷ throws from 38+',
+    pick: (rows) => {
+      const zone = rows.filter((r) => r.before >= 38);
+      return { v: zone.length === 0 ? NaN : zone.filter((r) => r.event === 'Finish').length / zone.length, n: zone.length };
+    },
+  },
+];
+const kpiFmt = (k: Kpi, v: number, digits = 0) => (k.num ? (Number.isNaN(v) ? '—' : v.toFixed(1)) : pct(v, digits));
+/** A player is flagged when this far from the team, on at least MIN_N throws. */
+const kpiGap = (k: Kpi) => (k.num ? 0.5 : 0.05);
+const MIN_N = 5;
+
+/**
+ * Tournaments review: pick the team and any players once; the KPI table and the trend both follow.
+ * ▼ marks where a player is clearly below the team — the individual's focus.
+ */
+function TournamentReview({ matches }: { matches: Match[] }) {
+  const [period, setPeriod] = useState<string>('');
+  const [showTeam, setShowTeam] = useState(true);
+  const [picked, setPicked] = useState<{ name: string; slot: number }[]>([]);
+  const [kpiKey, setKpiKey] = useState('hit');
+
+  const groups = new Map<string, Match[]>();
+  for (const m of [...matches].sort((a, b) => a.date.localeCompare(b.date))) {
+    const key = `${m.date} ${m.tournament}`;
+    groups.set(key, [...(groups.get(key) ?? []), m]);
+  }
+  const tours = [...groups].map(([key, ms]) => ({
+    key,
+    label: `${ms[0].date.slice(5)} ${ms[0].tournament || '(no name)'}`,
+    matches: ms.length,
+    games: ms.reduce((a, m) => a + m.sets.length, 0),
+    rows: ms.flatMap((m) => m.sets).flatMap((x) => deriveSet(x.config, x.records).rows.filter((r) => r.team === 'us')),
+  }));
+  if (tours.length === 0) return <div className="muted">No tournament matches yet.</div>;
+
+  // Players, most throws first.
+  const counts = new Map<string, number>();
+  tours.flatMap((t) => t.rows).forEach((r) => r.player && counts.set(r.player, (counts.get(r.player) ?? 0) + 1));
+  const players = [...counts].sort((a, b) => b[1] - a[1]).map(([p]) => p);
+  const togglePlayer = (p: string) => {
+    if (picked.some((x) => x.name === p)) setPicked(picked.filter((x) => x.name !== p));
+    else if (picked.length < SERIES_COLORS.length) {
+      const used = new Set(picked.map((x) => x.slot));
+      setPicked([...picked, { name: p, slot: SERIES_COLORS.findIndex((_, k) => !used.has(k)) }]);
+    }
+  };
+  const lines = [
+    ...(showTeam ? [{ name: 'Team', color: TEAM_COLOR, dashed: true, only: (_: DerivedThrow) => true }] : []),
+    ...picked.map(({ name, slot }) => ({ name, color: SERIES_COLORS[slot], dashed: false, only: (r: DerivedThrow) => r.player === name })),
+  ];
+  const swatch = (l: { color: string; dashed: boolean }) => <span className={`swatch ${l.dashed ? 'dashed' : ''}`} style={{ '--c': l.color } as CSSProperties} />;
+
+  const inPeriod = period ? tours.filter((t) => t.key === period) : tours;
+  const periodRows = inPeriod.flatMap((t) => t.rows);
+  const selIdx = period ? tours.findIndex((t) => t.key === period) : null;
+  const kpi = KPIS.find((k) => k.key === kpiKey) ?? KPIS[0];
+
+  const trendValues = (only: (r: DerivedThrow) => boolean) => tours.map((t) => kpi.pick(t.rows.filter(only)).v);
+  const allValues = lines.flatMap((l) => trendValues(l.only)).filter((v) => !Number.isNaN(v));
+  const domain: [number, number] = kpi.num
+    ? [0, Math.max(6, Math.ceil(Math.max(...allValues, 0) / 2) * 2)]
+    : kpi.key === 'finish' ? [0, 1] : [Math.min(0.5, Math.floor(Math.min(...allValues, 1) * 10) / 10), 1];
+
+  return (
+    <>
+      <div className="card col">
+        <div className="chips">
+          <button className={`chip ${showTeam ? 'on-series' : ''}`} style={{ '--c': TEAM_COLOR } as CSSProperties} onClick={() => setShowTeam(!showTeam)}>Team</button>
+          {players.map((p) => {
+            const pk = picked.find((x) => x.name === p);
+            return (
+              <button key={p} className={`chip ${pk ? 'on-series' : ''}`} style={pk ? ({ '--c': SERIES_COLORS[pk.slot] } as CSSProperties) : undefined}
+                disabled={!pk && picked.length >= SERIES_COLORS.length} onClick={() => togglePlayer(p)}>
+                {p}
+              </button>
+            );
+          })}
+        </div>
+        <select value={period} onChange={(e) => setPeriod(e.target.value)}>
+          <option value="">All tournaments</option>
+          {[...tours].reverse().map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+        </select>
+        <div className="muted tiny">
+          {inPeriod.reduce((a, t) => a + t.matches, 0)} matches · {inPeriod.reduce((a, t) => a + t.games, 0)} games · {periodRows.length} throws
+        </div>
+      </div>
+
+      {lines.length === 0 ? <div className="muted">Pick Team or players.</div> : (
+        <>
+          <div className="card col">
+            <div className="strong">Key numbers{period ? ` · ${tours[selIdx ?? 0].label}` : ''}</div>
+            <div className="table-scroll">
+              <table className="kpi">
+                <thead>
+                  <tr><th />{lines.map((l) => <th key={l.name} className="nowrap">{swatch(l)} {l.name}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {KPIS.map((k) => {
+                    const team = k.pick(periodRows);
+                    return (
+                      <tr key={k.key} className={k.key === kpiKey ? 'on' : ''} onClick={() => setKpiKey(k.key)}>
+                        <td>
+                          <div>{k.label}</div>
+                          <div className="muted tiny">{k.note}</div>
+                        </td>
+                        {lines.map((l) => {
+                          const { v, n } = k.pick(periodRows.filter(l.only));
+                          const isTeam = l.name === 'Team';
+                          const diff = v - team.v;
+                          const low = !isTeam && n >= MIN_N && diff <= -kpiGap(k);
+                          const high = !isTeam && n >= MIN_N && diff >= kpiGap(k);
+                          return (
+                            <td key={l.name} className={low ? 'low' : high ? 'high' : ''}>
+                              <span className="strong nowrap">{kpiFmt(k, v)}{low && '▼'}{high && '▲'}</span>
+                              <div className="muted tiny">{n}</div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="muted tiny">
+              Small figure = throws counted. ▼ / ▲ = {'≥'}5 points (0.5 for avg score) below / above the team, on {MIN_N}+ throws. Tap a row to see its trend.
+            </div>
+          </div>
+
+          <div className="card col">
+            <div className="strong">Trend by tournament</div>
+            <div className="chips">
+              {KPIS.map((k) => <button key={k.key} className={`chip ${k.key === kpiKey ? 'on' : ''}`} onClick={() => setKpiKey(k.key)}>{k.label}</button>)}
+            </div>
+            <div className="muted tiny">{kpi.label}: {kpi.note}</div>
+            <TrendChart
+              title={kpi.label}
+              labels={tours.map((t) => t.label)}
+              series={lines.map((l) => ({ name: l.name, color: l.color, dashed: l.dashed, values: trendValues(l.only) }))}
+              fmt={(v) => kpiFmt(kpi, v, 1)} tick={(v) => (kpi.num ? v.toFixed(0) : pct(v, 0))}
+              domain={domain}
+              sel={selIdx} onSelect={(i) => setPeriod(tours[i].key)}
+            />
+            <div className="muted tiny">Tap a point to show that tournament in Key numbers; choose "All tournaments" above to go back.</div>
+            <div className="table-scroll">
+              <table>
+                <thead><tr><th>Tournament</th>{lines.map((l) => <th key={l.name} className="nowrap">{swatch(l)} {l.name}</th>)}</tr></thead>
+                <tbody>
+                  {[...tours].reverse().map((t) => (
+                    <tr key={t.key}>
+                      <td>{t.label}</td>
+                      {lines.map((l) => {
+                        const { v, n } = kpi.pick(t.rows.filter(l.only));
+                        return <td key={l.name}>{kpiFmt(kpi, v)}<div className="muted tiny">{n}</div></td>;
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+    </>
   );
 }
 
 function Review({ data, go }: { data: AppData; go: Go }) {
   const [scope, setScope] = useState<'tournament' | 'practice'>('tournament');
-  const [tour, setTour] = useState<string>('');
   const [session, setSession] = useState<string>('');
   const tournamentMatches = data.matches.filter((m) => m.kind === 'tournament');
-  const tournaments = [...new Set(tournamentMatches.map((m) => `${m.date} ${m.tournament}`))].reverse();
-  const matches = tournamentMatches.filter((m) => !tour || `${m.date} ${m.tournament}` === tour);
-  const sets = matches.flatMap((m) => m.sets);
-  const s = teamStats(sets);
-  const ps = playerStats(sets);
   const header = (
     <>
       <header className="head">
@@ -1024,43 +1256,7 @@ function Review({ data, go }: { data: AppData; go: Go }) {
   return (
     <div className="screen">
       {header}
-      <select value={tour} onChange={(e) => setTour(e.target.value)}>
-        <option value="">All days</option>
-        {tournaments.map((t) => <option key={t}>{t}</option>)}
-      </select>
-      <div className="muted">{matches.length} matches · {s.sets} games · {s.throws} throws · games won at 50: {s.finishedSets}</div>
-      <div className="card col">
-        <div className="inline between"><span className="strong">Against goals</span><span className="muted tiny">Miss rate (0-point throws, incl. fouls)</span></div>
-        {GOALS.map((g) => <Bar key={g.key} label={g.label} r={s[g.key]} goal={g.goal} />)}
-        <div className="muted tiny">Full bar = 40%. Items with few throws are only indicative.</div>
-      </div>
-      <div className="card col">
-        <div className="strong">Other</div>
-        <div className="grid2">
-          <Stat label="Hits after 2 misses" value={`${s.afterTwoMisses.hits}/${s.afterTwoMisses.n}`} />
-          <Stat label="Over 50 → 25" value={String(s.bursts)} />
-          <Stat label="Avg first throw" value={Number.isNaN(s.firstThrowAvg) ? '—' : s.firstThrowAvg.toFixed(2)} />
-          <Stat label="Throws to finish" value={Number.isNaN(s.throwsPerFinishedSet) ? '—' : s.throwsPerFinishedSet.toFixed(1)} />
-        </div>
-      </div>
-      <div className="card col">
-        <div className="strong">By player (excl. first throw)</div>
-        <table>
-          <thead><tr><th>Player</th><th>Miss</th><th>Avg</th><th>38+</th><th>5–9 left</th></tr></thead>
-          <tbody>
-            {ps.map((p) => (
-              <tr key={p.player}>
-                <td>{p.player}</td>
-                <td>{pct(p.nonFirst.fault, 0)}<span className="muted tiny"> {p.nonFirst.n}</span></td>
-                <td>{p.avgScore.toFixed(1)}</td>
-                <td>{pct(p.zone.fault, 0)}<span className="muted tiny"> {p.zone.n}</span></td>
-                <td>{p.rem5to9.finishes}/{p.rem5to9.n}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="muted tiny">"5–9 left" = finishes / attempts.</div>
-      </div>
+      <TournamentReview matches={tournamentMatches} />
     </div>
   );
 }
