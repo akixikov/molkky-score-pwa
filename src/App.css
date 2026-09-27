@@ -171,3 +171,5 @@ td { padding: 6px 2px; border-top: 1px solid #EFEAE0; }
 .game-winner select { min-height: 36px; font-size: 14px; max-width: 60%; }
 .group-title { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; }
 .group-date { font-family: 'Barlow Condensed', sans-serif; font-size: 15px; color: var(--muted); font-weight: 600; }
+.filebtn.small { min-height: 36px; border-radius: 10px; padding: 0 8px; }
+.grid3 .small { padding: 0 6px; }

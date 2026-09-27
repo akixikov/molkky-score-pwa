@@ -22,7 +22,7 @@
    - アクセスできるユーザー：**全員**
    - **デプロイ** を押し、表示された **ウェブアプリの URL**（`https://script.google.com/macros/s/…/exec`）をコピー
 7. アプリの **Team sync** に URL・合言葉・自分の名前を入れて **Test connection** →「Connected.」→ **Save**
-8. これまでの記録も送るなら **Send all my records**。シートに `Games` と `Throws` が作られ、行が入ることを確認
+8. これまでの記録も送るなら **Resend all my matches**。シートに `Games` と `Throws` が作られ、行が入ることを確認
 9. スプレッドシートの **共有** で、メンバーを **閲覧者** として追加
 10. URL と合言葉をメンバーに個別に伝える
 
@@ -36,7 +36,7 @@
 1. アプリのホーム下の **Team sync** を開く
 2. 代表者から聞いた **Web app URL** と **Passphrase**、自分の名前（**Your name**）を入れる
 3. **Test connection** で「Connected.」と出たら **Save**
-4. すでにこの端末で記録した試合があれば **Send all my records**
+4. すでにこの端末で記録した試合があれば **Resend all my matches**
 
 以降は、記録を変更するたびに自動でシートに送られます。電波がないときは端末に残り、つながったときに送られます。
 ホームの **Team sync** の横に「○ unsent」（未送信の件数）や「Synced 時刻」が出ます。

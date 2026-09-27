@@ -279,12 +279,15 @@ function TeamSync({ sync, matches, go }: { sync: Sync; matches: Match[]; go: Go 
           <div>{pending} unsent · {sync.status.lastSync ? `last sync ${clock(sync.status.lastSync)}` : 'not synced yet'}</div>
           <div className="muted">{sync.remote.length} {sync.remote.length === 1 ? 'match' : 'matches'} from teammates</div>
           {sync.status.lastError && pending > 0 && <div className="warn-text">{errorText(sync.status.lastError)}</div>}
-          <div className="grid2">
-            <button className="ghost" disabled={sync.busy} onClick={() => void sync.run(true)}>{sync.busy ? 'Syncing…' : 'Sync now'}</button>
-            <button className="ghost" disabled={sync.busy || matches.length === 0} onClick={sync.sendAll}>Send all my records ({matches.length})</button>
-          </div>
+          <button className="ghost" disabled={sync.busy} onClick={() => void sync.run(true)}>{sync.busy ? 'Syncing…' : 'Sync now'}</button>
           <div className="muted tiny">
-            New changes are sent automatically, and teammates' matches are fetched when the app opens and after sending. "Send all my records" also sends matches recorded before sync was set up.
+            Changes are sent automatically, and teammates' matches are fetched when the app opens and after sending. Sync now does both right away.
+          </div>
+          <div className="col gap4">
+            <button className="link tiny" disabled={sync.busy || matches.length === 0} onClick={sync.sendAll}>Resend all my matches ({matches.length})</button>
+            <div className="muted tiny">
+              Only needed for matches recorded before sync was set up or while it was off, or after the sheet was replaced.
+            </div>
           </div>
           <button className={armed ? 'danger small' : 'link'} onClick={() => {
             if (armed) { sync.save({ ...clean, url: '', token: '' }); setForm({ ...form, url: '', token: '' }); setArmed(false); } else setArmed(true);
@@ -425,14 +428,14 @@ function Home({ data, all, update, go, sync }: { data: AppData; all: Match[]; up
         );
       })}
       <div className="spacer" />
+      <button className="primary big" onClick={() => go({ name: 'review' })}>Review</button>
       <button className="ghost sync-row" onClick={() => go({ name: 'sync' })}>
         <span>Team sync</span><span className="muted">{syncSummary(sync)}</span>
       </button>
-      <div className="grid2">
-        <button className="ghost" onClick={() => go({ name: 'review' })}>Review</button>
-        <button className="ghost" onClick={() => download(`molkky-${today()}.csv`, toCsv(data), 'text/csv')}>Export CSV</button>
-        <button className="ghost" onClick={() => download(`molkky-backup-${today()}.json`, JSON.stringify(data), 'application/json')}>Save backup</button>
-        <label className="ghost filebtn">
+      <div className="grid3">
+        <button className="ghost small" onClick={() => download(`molkky-${today()}.csv`, toCsv(data), 'text/csv')}>Export CSV</button>
+        <button className="ghost small" onClick={() => download(`molkky-backup-${today()}.json`, JSON.stringify(data), 'application/json')}>Save backup</button>
+        <label className="ghost small filebtn">
           Load backup
           <input type="file" accept="application/json" onChange={(e) => e.target.files?.[0] && importJson(e.target.files[0])} />
         </label>
@@ -1318,10 +1321,8 @@ const hitOf = (rows: DerivedThrow[]): KpiValue => ({ v: rows.length === 0 ? NaN 
 
 /** The key numbers, all counted over every throw (first throws included). */
 const KPIS: Kpi[] = [
+  // Headline measures first, then hit rates by situation (same order as the trend buttons).
   { key: 'hit', label: 'Hit rate', note: 'throws scoring 1+', pick: hitOf },
-  { key: 'afterMiss', label: 'After a miss', note: 'hit rate after 1 miss', pick: (rows) => hitOf(rows.filter((r) => r.faultStreak === 1)) },
-  { key: 'mid', label: 'Mid-game', note: 'hit rate, turns 4–6', pick: (rows) => hitOf(rows.filter((r) => r.teamIdx >= 4 && r.teamIdx <= 6)) },
-  { key: 'zone', label: 'Finishing zone', note: 'hit rate from 38+', pick: (rows) => hitOf(rows.filter((r) => r.before >= 38)) },
   {
     key: 'avg', label: 'Avg score', note: 'points per throw', num: true,
     pick: (rows) => ({ v: rows.length === 0 ? NaN : rows.reduce((a, r) => a + r.score, 0) / rows.length, n: rows.length }),
@@ -1333,6 +1334,9 @@ const KPIS: Kpi[] = [
       return { v: zone.length === 0 ? NaN : zone.filter((r) => r.event === 'Finish').length / zone.length, n: zone.length };
     },
   },
+  { key: 'afterMiss', label: 'After a miss', note: 'hit rate after 1 miss', pick: (rows) => hitOf(rows.filter((r) => r.faultStreak === 1)) },
+  { key: 'mid', label: 'Mid-game', note: 'hit rate, turns 4–6', pick: (rows) => hitOf(rows.filter((r) => r.teamIdx >= 4 && r.teamIdx <= 6)) },
+  { key: 'zone', label: 'Finishing zone', note: 'hit rate from 38+', pick: (rows) => hitOf(rows.filter((r) => r.before >= 38)) },
 ];
 const kpiFmt = (k: Kpi, v: number, digits = 0) => (k.num ? (Number.isNaN(v) ? '—' : v.toFixed(1)) : pct(v, digits));
 /** A player is flagged when this far from the team, on at least MIN_N throws. */
