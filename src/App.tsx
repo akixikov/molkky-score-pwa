@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type ReactNode } from 'react';
 import './App.css';
 import {
   deriveSet, hintsFor, MAX_PRACTICE_PLAYERS, other, PIN_ROWS, WIN_SCORE,
@@ -6,9 +6,14 @@ import {
 } from './rules';
 import { pct, teamStats } from './stats';
 import {
-  download, emptyData, loadData, saveData, setWinner, toCsv, tournamentKey, uid,
+  download, emptyData, loadData, saveData, setWinner, stampChanged, toCsv, tournamentKey, uid,
   type AppData, type Match, type SetEntry,
 } from './store';
+import {
+  afterFlush, emptyQueue, errorText, flush, isConfigured, loadQueue, loadSettings, loadStatus, newSettings, ping,
+  queueAll, queueChanges, saveQueue, saveSettings, saveStatus, URL_RE,
+  type SyncQueue, type SyncSettings, type SyncStatus,
+} from './sync';
 
 type Screen =
   | { name: 'home' }
@@ -16,7 +21,8 @@ type Screen =
   | { name: 'practice' }
   | { name: 'play'; matchId: string }
   | { name: 'match'; matchId: string }
-  | { name: 'review' };
+  | { name: 'review' }
+  | { name: 'sync' };
 
 const today = () => new Date().toLocaleDateString('sv-SE');
 type Names = Record<SideId, string>;
@@ -35,24 +41,33 @@ const dqNames = (st: SetState, names: Names) => st.order.filter((x) => st.teams[
 export default function App() {
   const [data, setData] = useState<AppData | null>(null);
   const [screen, setScreen] = useState<Screen>({ name: 'home' });
+  // The latest data, so consecutive updates and the sync see every change in order.
+  const dataRef = useRef<AppData | null>(null);
+  const sync = useTeamSync(() => dataRef.current?.matches ?? []);
 
   useEffect(() => {
-    loadData().then(setData);
+    loadData().then((d) => {
+      dataRef.current = d;
+      setData(d);
+    });
   }, []);
 
   const update = (fn: (d: AppData) => AppData) => {
-    setData((prev) => {
-      const next = fn(prev ?? emptyData());
-      saveData(next);
-      return next;
-    });
+    const prev = dataRef.current ?? emptyData();
+    const next = stampChanged(prev, fn(prev));
+    dataRef.current = next;
+    setData(next);
+    saveData(next);
+    sync.onChange(prev, next);
   };
 
   if (!data) return <div className="screen">Loading…</div>;
 
   switch (screen.name) {
     case 'home':
-      return <Home data={data} update={update} go={setScreen} />;
+      return <Home data={data} update={update} go={setScreen} sync={sync} />;
+    case 'sync':
+      return <TeamSync sync={sync} matches={data.matches} go={setScreen} />;
     case 'new':
       return <NewMatch data={data} update={update} go={setScreen} />;
     case 'practice':
@@ -61,12 +76,12 @@ export default function App() {
       return <Review data={data} go={setScreen} />;
     case 'play': {
       const m = data.matches.find((x) => x.id === screen.matchId);
-      if (!m) return <Home data={data} update={update} go={setScreen} />;
+      if (!m) return <Home data={data} update={update} go={setScreen} sync={sync} />;
       return <Play match={m} data={data} update={update} go={setScreen} />;
     }
     case 'match': {
       const m = data.matches.find((x) => x.id === screen.matchId);
-      if (!m) return <Home data={data} update={update} go={setScreen} />;
+      if (!m) return <Home data={data} update={update} go={setScreen} sync={sync} />;
       return <MatchSummary match={m} update={update} go={setScreen} />;
     }
   }
@@ -74,6 +89,179 @@ export default function App() {
 
 type Update = (fn: (d: AppData) => AppData) => void;
 type Go = (s: Screen) => void;
+
+/* ---------------- Team sync ---------------- */
+
+interface Sync {
+  settings: SyncSettings | null;
+  queue: SyncQueue;
+  status: SyncStatus;
+  busy: boolean;
+  onChange: (prev: AppData, next: AppData) => void;
+  save: (s: SyncSettings) => void;
+  run: () => Promise<void>;
+  sendAll: () => void;
+}
+
+/**
+ * Keeps the unsent queue and sends it to the team spreadsheet: shortly after each change,
+ * when the app starts or comes back to the foreground, and when the device goes online.
+ */
+function useTeamSync(getMatches: () => Match[]): Sync {
+  const [settings, setSettings] = useState<SyncSettings | null>(null);
+  const [queue, setQueue] = useState<SyncQueue>(emptyQueue());
+  const [status, setStatus] = useState<SyncStatus>({});
+  const [busy, setBusy] = useState(false);
+  const ref = useRef({ settings: null as SyncSettings | null, queue: emptyQueue(), running: false, again: false, timer: 0 });
+
+  const writeQueue = (q: SyncQueue) => {
+    ref.current.queue = q;
+    setQueue(q);
+    saveQueue(q);
+  };
+  const writeStatus = (fn: (s: SyncStatus) => SyncStatus) => setStatus((prev) => {
+    const next = fn(prev);
+    saveStatus(next);
+    return next;
+  });
+
+  const run = async () => {
+    const s = ref.current.settings;
+    if (!isConfigured(s)) return;
+    if (ref.current.running) { ref.current.again = true; return; }
+    const q = ref.current.queue;
+    if (q.put.length === 0 && q.del.length === 0) return;
+    ref.current.running = true;
+    setBusy(true);
+    const r = await flush(s, q, getMatches());
+    writeQueue(afterFlush(ref.current.queue, r, getMatches()));
+    writeStatus((prev) => (r.error
+      ? { ...prev, lastError: r.error }
+      : { lastSync: Date.now(), lastError: r.refused.length > 0 ? 'not-owner' : undefined }));
+    ref.current.running = false;
+    setBusy(false);
+    if (ref.current.again) { ref.current.again = false; void run(); }
+  };
+
+  useEffect(() => {
+    Promise.all([loadSettings(), loadQueue(), loadStatus()]).then(([s, q, st]) => {
+      ref.current.settings = s;
+      ref.current.queue = q;
+      setSettings(s);
+      setQueue(q);
+      setStatus(st);
+      if (s?.auto) void run();
+    });
+    const retry = () => { if (ref.current.settings?.auto && document.visibilityState === 'visible') void run(); };
+    window.addEventListener('online', retry);
+    document.addEventListener('visibilitychange', retry);
+    return () => {
+      window.removeEventListener('online', retry);
+      document.removeEventListener('visibilitychange', retry);
+    };
+  }, []);
+
+  return {
+    settings, queue, status, busy, run,
+    onChange: (prev, next) => {
+      if (!isConfigured(ref.current.settings)) return;
+      writeQueue(queueChanges(ref.current.queue, prev.matches, next.matches));
+      if (ref.current.settings.auto) {
+        window.clearTimeout(ref.current.timer);
+        ref.current.timer = window.setTimeout(() => void run(), 1500);
+      }
+    },
+    save: (s) => {
+      ref.current.settings = s;
+      setSettings(s);
+      saveSettings(s);
+      if (!isConfigured(s)) writeQueue(emptyQueue());
+    },
+    sendAll: () => {
+      writeQueue(queueAll(ref.current.queue, getMatches()));
+      void run();
+    },
+  };
+}
+
+const clock = (t: number) => {
+  const d = new Date(t);
+  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return d.toDateString() === new Date().toDateString() ? time : `${d.toLocaleDateString('sv-SE').slice(5)} ${time}`;
+};
+
+/** One-line sync state for the home screen. */
+function syncSummary(sync: Sync): string {
+  if (!isConfigured(sync.settings)) return 'Off';
+  const pending = sync.queue.put.length + sync.queue.del.length;
+  if (sync.busy) return 'Sending…';
+  if (sync.status.lastError && pending > 0) return `${pending} unsent · ${errorText(sync.status.lastError)}`;
+  if (pending > 0) return `${pending} unsent`;
+  return sync.status.lastSync ? `Synced ${clock(sync.status.lastSync)}` : 'On';
+}
+
+/** Connects this phone to the team spreadsheet's web app. */
+function TeamSync({ sync, matches, go }: { sync: Sync; matches: Match[]; go: Go }) {
+  const [form, setForm] = useState<SyncSettings>(() => sync.settings ?? newSettings());
+  const [test, setTest] = useState('');
+  const [armed, setArmed] = useState(false);
+  const clean = { ...form, url: form.url.trim(), token: form.token.trim(), recorder: form.recorder.trim() };
+  const urlOk = URL_RE.test(clean.url);
+  const valid = urlOk && !!clean.token && !!clean.recorder;
+  const on = isConfigured(sync.settings);
+  const pending = sync.queue.put.length + sync.queue.del.length;
+  const field = (k: 'url' | 'token' | 'recorder') => (e: ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
+  const testConnection = async () => {
+    setTest('Testing…');
+    const r = await ping(clean);
+    setTest(r.ok ? 'Connected.' : errorText(r.error));
+  };
+  return (
+    <div className="screen">
+      <header className="head">
+        <button className="link" onClick={() => go({ name: 'home' })}>← Back</button>
+        <h1>Team sync</h1>
+      </header>
+      <div className="muted">
+        Sends the matches recorded on this phone to the team spreadsheet. Ask the person who set up the sheet for the web app URL and the passphrase.
+      </div>
+      <div className="card col">
+        <label className="field">
+          Web app URL
+          <input value={form.url} onChange={field('url')} placeholder="https://script.google.com/macros/s/…/exec" autoCapitalize="off" autoCorrect="off" spellCheck={false} />
+        </label>
+        {form.url.trim() && !urlOk && <div className="muted tiny warn-text">The URL should start with https://script.google.com/macros/s/ and end with /exec.</div>}
+        <label className="field">Passphrase<input type="password" value={form.token} onChange={field('token')} autoCapitalize="off" autoCorrect="off" /></label>
+        <label className="field">Your name<input value={form.recorder} onChange={field('recorder')} placeholder="Shown to teammates, e.g. Aki" /></label>
+        <label className="inline check"><input type="checkbox" checked={form.auto} onChange={(e) => setForm({ ...form, auto: e.target.checked })} /> Sync automatically</label>
+        <div className="grid2">
+          <button className="ghost" disabled={!urlOk || !clean.token} onClick={testConnection}>Test connection</button>
+          <button className="primary" disabled={!valid} onClick={() => { sync.save(clean); setTest(''); }}>Save</button>
+        </div>
+        {test && <div className="muted">{test}</div>}
+      </div>
+      {on && (
+        <div className="card col">
+          <div className="strong">Status</div>
+          <div>{pending} unsent · {sync.status.lastSync ? `last sync ${clock(sync.status.lastSync)}` : 'not synced yet'}</div>
+          {sync.status.lastError && pending > 0 && <div className="warn-text">{errorText(sync.status.lastError)}</div>}
+          <div className="grid2">
+            <button className="ghost" disabled={sync.busy || pending === 0} onClick={() => void sync.run()}>{sync.busy ? 'Sending…' : 'Sync now'}</button>
+            <button className="ghost" disabled={sync.busy || matches.length === 0} onClick={sync.sendAll}>Send all my records ({matches.length})</button>
+          </div>
+          <div className="muted tiny">
+            New changes are sent automatically. "Send all my records" also sends matches recorded before sync was set up.
+          </div>
+          <button className={armed ? 'danger small' : 'link'} onClick={() => {
+            if (armed) { sync.save({ ...clean, url: '', token: '' }); setForm({ ...form, url: '', token: '' }); setArmed(false); } else setArmed(true);
+          }}>
+            {armed ? 'Really turn off sync' : 'Turn off sync'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function patchMatch(d: AppData, id: string, fn: (m: Match) => Match): AppData {
   return { ...d, matches: d.matches.map((m) => (m.id === id ? fn(m) : m)) };
@@ -89,7 +277,7 @@ function patchCurrentSet(m: Match, fn: (s: SetEntry) => SetEntry): Match {
 
 const COLLAPSED_KEY = 'molkky-collapsed-groups';
 
-function Home({ data, update, go }: { data: AppData; update: Update; go: Go }) {
+function Home({ data, update, go, sync }: { data: AppData; update: Update; go: Go; sync: Sync }) {
   const [armed, setArmed] = useState<string | null>(null);
   const importJson = async (file: File) => {
     try {
@@ -200,6 +388,9 @@ function Home({ data, update, go }: { data: AppData; update: Update; go: Go }) {
         );
       })}
       <div className="spacer" />
+      <button className="ghost sync-row" onClick={() => go({ name: 'sync' })}>
+        <span>Team sync</span><span className="muted">{syncSummary(sync)}</span>
+      </button>
       <div className="grid2">
         <button className="ghost" onClick={() => go({ name: 'review' })}>Review</button>
         <button className="ghost" onClick={() => download(`molkky-${today()}.csv`, toCsv(data), 'text/csv')}>Export CSV</button>

@@ -11,14 +11,17 @@
 ## 構成
 - `src/rules.ts` — ルールエンジン。得点・バースト（50超→25）・上がり（ちょうど50）・3連続ミス失格・次の投擲者・ヒントを**すべてここで導出**
 - `src/stats.ts` — 集計（フォルト率、1ミス直後、4〜6投目、26/38点以上、選手別）
-- `src/store.ts` — IndexedDB（idb-keyval）保存、CSV 書き出し
+- `src/store.ts` — IndexedDB（idb-keyval）保存、CSV 書き出し（`rowsForMatch` はシート同期と共通）
+- `src/sync.ts` — チーム共有シートへの同期（設定・未送信キュー・送信）。設定と合言葉は本体データ・バックアップと別に保存
+- `apps-script/Code.gs` — チームのシートに貼る Apps Script（ウェブアプリ）。`src/appsScript.test.ts` が同じコードを擬似シートで検証する
 - `src/App.tsx` / `App.css` — 画面（ホーム、セット準備、投擲入力、相手入力、セット終了、振り返り）
 - `vite.config.ts` — base `/molkky-score-pwa/`、vite-plugin-pwa
 - `.github/workflows/deploy.yml` — test → build → Pages
 
 ## 守ること
 - **記録は事実だけ**（誰が投げたか、1投ごとの得点）。倒れたピンは記録しない（古い記録には `pins` が残っている）。合計・イベント・勝敗は保存せず、常に `deriveSet` で導出する
-- **公開リポジトリ**。実データ（`fixtures-private/`）、合言葉、個人のスプレッドシートURLは絶対にコミットしない
+- **公開リポジトリ**。実データ（`fixtures-private/`）、合言葉、個人のスプレッドシートURL・ウェブアプリURL・シートIDは絶対にコミットしない
+- `SHEET_COLUMNS`（`src/store.ts`）と `THROW_COLUMNS`（`apps-script/Code.gs`）は同じに保つ（テストで確認）。`Code.gs` を変えたら代表者がシートへ反映し「新バージョン」でデプロイし直す
 - TypeScript は `erasableSyntaxOnly`（enum 禁止）、`noUnusedLocals/Parameters`
 - UI は英語（コメントも英語）。色: 背景 #F3EFE6、主色 #2E6B4E、警告 #A84B14、相手 #2F5D8A。フォント Zen Kaku Gothic New / Barlow Condensed
 - 練習ゲーム: 1ゲーム＝1試合（kind `practice`）で、`config.sides` に全サイド（2〜6、合計最大6人、全員の投擲者を記録）。大会は `sides` なしで us / them。3連続ミスのサイドは抜けて続行、最後の1サイドが勝ち

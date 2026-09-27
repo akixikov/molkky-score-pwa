@@ -1,0 +1,156 @@
+// Team sync: sends this device's matches to the team spreadsheet's Apps Script web app.
+// Settings, the unsent queue and the status live apart from the records (and out of backups),
+// so the passphrase never ends up in an exported file.
+import { get, set } from 'idb-keyval';
+import { rowsForMatch, uid, type Match } from './store';
+
+export interface SyncSettings {
+  url: string;
+  token: string;
+  /** Identifies this device as the owner of the matches it records. */
+  deviceId: string;
+  /** Shown to teammates as who recorded a match. */
+  recorder: string;
+  auto: boolean;
+}
+
+/** Matches to send (by id) and matches to delete on the sheet. */
+export interface SyncQueue {
+  put: string[];
+  del: string[];
+}
+
+export interface SyncStatus {
+  lastSync?: number;
+  lastError?: string;
+}
+
+const SETTINGS_KEY = 'molkky-sync-v1';
+const QUEUE_KEY = 'molkky-sync-queue-v1';
+const STATUS_KEY = 'molkky-sync-status-v1';
+
+export const URL_RE = /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/;
+export const emptyQueue = (): SyncQueue => ({ put: [], del: [] });
+export const newSettings = (): SyncSettings => ({ url: '', token: '', deviceId: uid(), recorder: '', auto: true });
+export const isConfigured = (s: SyncSettings | null): s is SyncSettings => !!s && URL_RE.test(s.url) && !!s.token;
+
+async function load<T>(key: string, fallback: T): Promise<T> {
+  try {
+    return (await get<T>(key)) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+export const loadSettings = () => load<SyncSettings | null>(SETTINGS_KEY, null);
+export const saveSettings = (s: SyncSettings | null) => set(SETTINGS_KEY, s);
+export const loadQueue = () => load<SyncQueue>(QUEUE_KEY, emptyQueue());
+export const saveQueue = (q: SyncQueue) => set(QUEUE_KEY, q);
+export const loadStatus = () => load<SyncStatus>(STATUS_KEY, {});
+export const saveStatus = (s: SyncStatus) => set(STATUS_KEY, s);
+
+/** Adds changed and removed matches to the queue. A match changed several times is sent once. */
+export function queueChanges(q: SyncQueue, prev: Match[], next: Match[]): SyncQueue {
+  const before = new Map(prev.map((m) => [m.id, m]));
+  const after = new Set(next.map((m) => m.id));
+  const changed = next.filter((m) => before.get(m.id) !== m).map((m) => m.id);
+  const removed = prev.filter((m) => !after.has(m.id)).map((m) => m.id);
+  return {
+    put: [...new Set([...q.put.filter((id) => !removed.includes(id)), ...changed])],
+    del: [...new Set([...q.del.filter((id) => !changed.includes(id)), ...removed])],
+  };
+}
+
+/** Queues every match on this device, e.g. for the first sync. */
+export const queueAll = (q: SyncQueue, matches: Match[]): SyncQueue => ({
+  put: [...new Set([...q.put, ...matches.map((m) => m.id)])],
+  del: q.del,
+});
+
+export interface Reply {
+  ok: boolean;
+  error?: string;
+  [key: string]: unknown;
+}
+
+type Fetch = typeof fetch;
+
+/** One request to the web app. text/plain avoids a CORS preflight, which Apps Script cannot answer. */
+export async function call(url: string, body: object, fetchImpl: Fetch = fetch): Promise<Reply> {
+  let res: Response;
+  try {
+    res = await fetchImpl(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) });
+  } catch {
+    return { ok: false, error: 'network' };
+  }
+  try {
+    const data = (await res.json()) as Reply;
+    return typeof data?.ok === 'boolean' ? data : { ok: false, error: 'bad-response' };
+  } catch {
+    return { ok: false, error: 'bad-response' };
+  }
+}
+
+export const ping = (s: SyncSettings, fetchImpl?: Fetch) => call(s.url, { op: 'ping', token: s.token }, fetchImpl);
+
+export interface FlushResult {
+  /** Sent matches with the version that was sent, and deletions that went through. */
+  sent: { id: string; updatedAt?: number }[];
+  deleted: string[];
+  /** Matches the sheet refused because another device recorded them; they are dropped from the queue. */
+  refused: string[];
+  /** Queued matches no longer on this device (their deletion is queued separately). */
+  dropped: string[];
+  error?: string;
+}
+
+/**
+ * Sends the queue in order: deletions, then matches. Stops at the first failure other than
+ * 'not-owner' (a network or passphrase problem would fail every request anyway).
+ */
+export async function flush(s: SyncSettings, q: SyncQueue, matches: Match[], fetchImpl?: Fetch): Promise<FlushResult> {
+  const out: FlushResult = { sent: [], deleted: [], refused: [], dropped: [] };
+  const base = { token: s.token, deviceId: s.deviceId };
+  for (const id of q.del) {
+    const r = await call(s.url, { ...base, op: 'deleteMatch', matchId: id }, fetchImpl);
+    if (r.ok) out.deleted.push(id);
+    else if (r.error === 'not-owner') out.refused.push(id);
+    else return { ...out, error: r.error };
+  }
+  for (const id of q.put) {
+    const m = matches.find((x) => x.id === id);
+    if (!m) { out.dropped.push(id); continue; }
+    const r = await call(s.url, { ...base, op: 'putMatch', recorder: s.recorder, match: m, rows: rowsForMatch(m) }, fetchImpl);
+    if (r.ok) out.sent.push({ id, updatedAt: m.updatedAt });
+    else if (r.error === 'not-owner') out.refused.push(id);
+    else return { ...out, error: r.error };
+  }
+  return out;
+}
+
+/**
+ * Removes what went through from the queue as it is now. A match changed again while it was
+ * being sent stays queued, so the newer version goes out next time.
+ */
+export function afterFlush(q: SyncQueue, r: FlushResult, matches: Match[]): SyncQueue {
+  const current = new Map(matches.map((m) => [m.id, m.updatedAt]));
+  const done = new Set([
+    ...r.sent.filter((x) => current.get(x.id) === x.updatedAt).map((x) => x.id),
+    ...r.refused,
+    ...r.dropped,
+  ]);
+  const deleted = new Set([...r.deleted.filter((id) => !current.has(id)), ...r.refused]);
+  return { put: q.put.filter((id) => !done.has(id)), del: q.del.filter((id) => !deleted.has(id)) };
+}
+
+/** User-facing text for an error code from the web app or the network. */
+export function errorText(code: string | undefined): string {
+  switch (code) {
+    case 'unauthorized': return 'Wrong passphrase.';
+    case 'network': return 'No connection. Will retry.';
+    case 'bad-response': return 'Unexpected reply. Check the web app URL and that it is deployed for "Anyone".';
+    case 'not-owner': return 'A match was recorded on another device and was skipped.';
+    case 'too-large': return 'A match is too large for one sheet cell.';
+    case undefined: return '';
+    default: return `Sync failed (${code}).`;
+  }
+}

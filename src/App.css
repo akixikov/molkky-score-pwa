@@ -162,3 +162,8 @@ td { padding: 6px 2px; border-top: 1px solid #EFEAE0; }
 .kpi th, .kpi td { vertical-align: top; }
 .trend-scroll { overflow-x: auto; flex: 1; min-width: 0; }
 .trend .xlab.on { fill: var(--text, #2B2B2B); font-weight: 700; }
+.sync-row { display: flex; justify-content: space-between; align-items: center; padding: 0 14px; gap: 12px; }
+.sync-row .muted { text-align: right; }
+.warn-text { color: var(--warn); }
+.check { font-size: 15px; }
+.check input { width: 20px; min-height: 20px; flex: none; accent-color: var(--accent); }
