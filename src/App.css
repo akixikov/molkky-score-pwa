@@ -1,3 +1,5 @@
+*, *::before, *::after { box-sizing: border-box; }
+
 /* ---------- Layout and text ---------- */
 .screen { max-width: 480px; min-height: 100dvh; margin: 0 auto; display: flex; flex-direction: column; gap: 14px;
   padding: max(16px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom)); }
