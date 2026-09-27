@@ -253,18 +253,42 @@ function RosterChips({ names, onPick, onDelete }: { names: string[]; onPick: (n:
   );
 }
 
+/**
+ * Name box for adding a member. It is swapped for a fresh input after each add, so an
+ * unfinished IME or predictive-text composition cannot write the previous name back in.
+ */
+function MemberInput({ onAdd }: { onAdd: (name: string) => void }) {
+  const [name, setName] = useState('');
+  const [round, setRound] = useState(0);
+  const add = () => {
+    const n = name.trim();
+    if (!n) return;
+    onAdd(n);
+    setName('');
+    setRound((r) => r + 1);
+  };
+  return (
+    <div className="inline">
+      <input
+        key={round} autoFocus={round > 0} value={name} placeholder="Add member"
+        onChange={(e) => setName(e.target.value)}
+        // Enter while converting kana only confirms the conversion.
+        onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && add()}
+      />
+      <button className="ghost small" onClick={add}>Add</button>
+    </div>
+  );
+}
+
 function LineupEditor({ roster, lineup, onChange, onAddRoster, onRemoveRoster, max }: {
   roster: string[]; lineup: string[]; onChange: (l: string[]) => void; onAddRoster: (n: string) => void;
   onRemoveRoster?: (n: string) => void; max?: number;
 }) {
-  const [name, setName] = useState('');
   const full = max !== undefined && lineup.length >= max;
-  const add = () => {
-    const n = name.trim();
-    if (!n || full) return;
+  const add = (n: string) => {
+    if (full) return;
     if (!roster.includes(n)) onAddRoster(n);
     if (!lineup.includes(n)) onChange([...lineup, n]);
-    setName('');
   };
   return (
     <div className="card col">
@@ -285,10 +309,7 @@ function LineupEditor({ roster, lineup, onChange, onAddRoster, onRemoveRoster, m
       {full ? <div className="muted tiny">Up to {max} players.</div> : (
         <>
           <RosterChips names={roster.filter((r) => !lineup.includes(r))} onPick={(r) => onChange([...lineup, r])} onDelete={onRemoveRoster} />
-          <div className="inline">
-            <input value={name} placeholder="Add member" onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
-            <button className="ghost small" onClick={add}>Add</button>
-          </div>
+          <MemberInput onAdd={add} />
         </>
       )}
     </div>
@@ -371,17 +392,14 @@ function PracticeSetup({ data, update, go }: { data: AppData; update: Update; go
   const [solo, setSolo] = useState<string[]>(lastSides && !lastWasTeams ? lastSides.map((x) => x.lineup[0]) : []);
   const [teams, setTeams] = useState<string[][]>(lastSides && lastWasTeams ? lastSides.map((x) => x.lineup) : [[], []]);
   const [firstIdx, setFirstIdx] = useState(0);
-  const [name, setName] = useState('');
 
   const assigned = teams.flat();
   const teamsFull = assigned.length >= MAX_PRACTICE_PLAYERS;
   const addRoster = (n: string) => update((d) => ({ ...d, roster: [...d.roster, n] }));
   const removeRoster = (n: string) => update((d) => ({ ...d, roster: d.roster.filter((x) => x !== n) }));
   const setTeam = (i: number, members: string[]) => setTeams(teams.map((t, k) => (k === i ? members : t)));
-  const addMember = () => {
-    const n = name.trim();
-    if (n && !data.roster.includes(n)) addRoster(n);
-    setName('');
+  const addMember = (n: string) => {
+    if (!data.roster.includes(n)) addRoster(n);
   };
 
   const groups = format === 'solo' ? solo.map((p) => [p]) : teams;
@@ -435,10 +453,7 @@ function PracticeSetup({ data, update, go }: { data: AppData; update: Update; go
               )}
             </div>
           ))}
-          <div className="inline">
-            <input value={name} placeholder="Add member" onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addMember()} />
-            <button className="ghost small" onClick={addMember}>Add</button>
-          </div>
+          <MemberInput onAdd={addMember} />
           {teams.length < MAX_TEAMS && <button className="ghost" onClick={() => setTeams([...teams, []])}>＋ Add team</button>}
           <div className="card col">
             <div className="strong">First to throw</div>
@@ -826,8 +841,8 @@ function TeamStatsCard({ title, sets }: { title: string; sets: SetEntry[] }) {
     <div className="card col">
       <div className="strong">{title}</div>
       <div className="grid2">
-        <Stat label="Throws" value={String(s.throws)} />
         <Stat label="Finisher" value={finishers.length === 0 ? '—' : finishers.join(', ')} />
+        <Stat label="Throws" value={String(s.throws)} />
         <Stat label="Avg per throw" value={avg} />
         <Stat label="Miss rate" value={pct(s.overall.fault)} />
       </div>
