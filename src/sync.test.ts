@@ -107,6 +107,15 @@ describe('flush', () => {
     expect(afterFlush({ put: ['a'], del: [] }, r, [match('a', 1)])).toEqual({ put: [], del: [] });
   });
 
+  it('reports each finished item as it goes, so an interrupted send keeps its progress', async () => {
+    let q = { put: ['a', 'b', 'c'], del: ['x'] };
+    const matches = [match('a'), match('b'), match('c')];
+    const f = fakeFetch([{ ok: true }, { ok: true }, { ok: true }, new TypeError('offline')]);
+    const r = await flush(settings, q, matches, f.fn, (done) => { q = afterFlush(q, done, matches); });
+    expect(r.error).toBe('network');
+    expect(q).toEqual({ put: ['c'], del: [] });
+  });
+
   it('drops queued matches that no longer exist', async () => {
     const r = await flush(settings, { put: ['gone'], del: [] }, [], fakeFetch([]).fn);
     expect(afterFlush({ put: ['gone'], del: [] }, r, [])).toEqual({ put: [], del: [] });

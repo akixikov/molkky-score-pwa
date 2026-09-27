@@ -147,7 +147,8 @@ function useTeamSync(getMatches: () => Match[]): Sync {
     let error: string | undefined;
     let refused = false;
     if (needPush) {
-      const r = await flush(s, q, getMatches());
+      // Take each finished match off the queue at once, so a long send cut short still counts.
+      const r = await flush(s, q, getMatches(), undefined, (done) => writeQueue(afterFlush(ref.current.queue, done, getMatches())));
       writeQueue(afterFlush(ref.current.queue, r, getMatches()));
       error = r.error;
       refused = r.refused.length > 0;
@@ -226,7 +227,7 @@ const clock = (t: number) => {
 function syncSummary(sync: Sync): string {
   if (!isConfigured(sync.settings)) return 'Off';
   const pending = sync.queue.put.length + sync.queue.del.length;
-  if (sync.busy) return 'Syncing…';
+  if (sync.busy) return pending > 0 ? `Sending… ${pending} left` : 'Syncing…';
   if (sync.status.lastError && pending > 0) return `${pending} unsent · ${errorText(sync.status.lastError)}`;
   if (pending > 0) return `${pending} unsent`;
   return sync.status.lastSync ? `Synced ${clock(sync.status.lastSync)}` : 'On';
@@ -1256,11 +1257,13 @@ function TrendChart({ title, labels, hollow, series, fmt, tick, domain, sel, onS
   // Missing values (e.g. a player who skipped a tournament) break the line.
   const pathOf = (v: { i: number; value: number }[]) =>
     v.map((p, k) => `${k && v[k - 1].i === p.i - 1 ? 'L' : 'M'}${x(p.i)},${y(p.value)}`).join(' ');
-  const shown = sel ?? (n > 0 ? n - 1 : null);
+  // Nothing is highlighted while "All dates" is chosen; tapping a point picks that date.
+  const shown = sel;
   const slot = n > 1 ? (PW - PAD * 2) / (n - 1) : PW;
   return (
     <div className="trend">
       <div className="strong">{title}</div>
+      {shown === null && <div className="readout muted tiny">Tap a point to see each date.</div>}
       {shown !== null && (
         <div className="readout muted tiny">
           <span>{labels[shown]}:</span>
@@ -1465,9 +1468,14 @@ function ReviewBody({ matches }: { matches: Match[] }) {
 
           <div className="card col">
             <div className="strong">Trend</div>
-            <div className="chips">
-              {KPIS.map((k) => <button key={k.key} className={`chip ${k.key === kpiKey ? 'on' : ''}`} onClick={() => setKpiKey(k.key)}>{k.label}</button>)}
-            </div>
+            {/* Headline measures on the first row, situational hit rates below. */}
+            {[['hit', 'avg', 'finish'], ['afterMiss', 'mid', 'zone']].map((row) => (
+              <div key={row[0]} className="chips">
+                {row.map((key) => KPIS.find((k) => k.key === key)!).map((k) => (
+                  <button key={k.key} className={`chip ${k.key === kpiKey ? 'on' : ''}`} onClick={() => setKpiKey(k.key)}>{k.label}</button>
+                ))}
+              </div>
+            ))}
             <div className="muted tiny">{kpi.label}: {kpi.note}</div>
             <TrendChart
               title={kpi.label}

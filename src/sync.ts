@@ -116,22 +116,31 @@ export interface FlushResult {
 /**
  * Sends the queue in order: deletions, then matches. Stops at the first failure other than
  * 'not-owner' (a network or passphrase problem would fail every request anyway).
+ * onStep reports each finished item right away, so progress survives the app being closed mid-way.
  */
-export async function flush(s: SyncSettings, q: SyncQueue, matches: Match[], fetchImpl?: Fetch): Promise<FlushResult> {
+export async function flush(
+  s: SyncSettings, q: SyncQueue, matches: Match[], fetchImpl?: Fetch, onStep?: (done: FlushResult) => void,
+): Promise<FlushResult> {
   const out: FlushResult = { sent: [], deleted: [], refused: [], dropped: [] };
+  const step = (key: 'deleted' | 'refused' | 'dropped', id: string) => {
+    out[key].push(id);
+    onStep?.({ sent: [], deleted: [], refused: [], dropped: [], [key]: [id] });
+  };
   const base = { token: s.token, deviceId: s.deviceId };
   for (const id of q.del) {
     const r = await call(s.url, { ...base, op: 'deleteMatch', matchId: id }, fetchImpl);
-    if (r.ok) out.deleted.push(id);
-    else if (r.error === 'not-owner') out.refused.push(id);
+    if (r.ok) step('deleted', id);
+    else if (r.error === 'not-owner') step('refused', id);
     else return { ...out, error: r.error };
   }
   for (const id of q.put) {
     const m = matches.find((x) => x.id === id);
-    if (!m) { out.dropped.push(id); continue; }
+    if (!m) { step('dropped', id); continue; }
     const r = await call(s.url, { ...base, op: 'putMatch', recorder: s.recorder, match: m, rows: rowsForMatch(m) }, fetchImpl);
-    if (r.ok) out.sent.push({ id, updatedAt: m.updatedAt });
-    else if (r.error === 'not-owner') out.refused.push(id);
+    if (r.ok) {
+      out.sent.push({ id, updatedAt: m.updatedAt });
+      onStep?.({ sent: [{ id, updatedAt: m.updatedAt }], deleted: [], refused: [], dropped: [] });
+    } else if (r.error === 'not-owner') step('refused', id);
     else return { ...out, error: r.error };
   }
   return out;
