@@ -25,6 +25,8 @@ export interface Match {
   sets: SetEntry[];
   /** Last local change (ms). Used by team sync. */
   updatedAt?: number;
+  /** Set only on teammates' matches pulled from the team sheet (who recorded it); never stored with own data. */
+  remoteBy?: string;
 }
 
 export interface AppData {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { rowsForMatch, toCsv, type Match } from './store';
-import { afterFlush, call, flush, queueAll, queueChanges, URL_RE, type SyncSettings } from './sync';
+import { afterFlush, call, flush, fromPull, pull, queueAll, queueChanges, URL_RE, type SyncSettings } from './sync';
 
 const match = (id: string, updatedAt = 1): Match => ({
   id, date: '2026-09-21', tournament: 'Nara Open', opponent: 'Kanto', kind: 'tournament', updatedAt,
@@ -118,5 +118,26 @@ describe('URL check', () => {
     expect(URL_RE.test(settings.url)).toBe(true);
     expect(URL_RE.test('https://script.google.com/macros/s/abc/dev')).toBe(false);
     expect(URL_RE.test('https://example.com/macros/s/abc/exec')).toBe(false);
+  });
+});
+
+describe('pull', () => {
+  it("keeps teammates' matches and leaves out this device's and deleted ones", () => {
+    const games = [
+      { matchId: 'a', deviceId: 'dev1', recorder: 'Aki', deletedAt: '', match: match('a') },
+      { matchId: 'b', deviceId: 'dev2', recorder: 'Ken', deletedAt: '', match: match('b') },
+      { matchId: 'c', deviceId: 'dev2', recorder: 'Ken', deletedAt: '2026-09-27T10:00:00Z', match: null },
+      { matchId: 'd', deviceId: 'dev3', recorder: 'Mai', deletedAt: '', match: { id: 'd' } },
+    ];
+    expect(fromPull(games, 'dev1')).toEqual([{ match: match('b'), deviceId: 'dev2', recorder: 'Ken' }]);
+    expect(fromPull('nope', 'dev1')).toBeNull();
+  });
+
+  it('asks the web app for every game', async () => {
+    const f = fakeFetch([{ ok: true, games: [{ deviceId: 'dev2', recorder: 'Ken', deletedAt: '', match: match('b') }] }]);
+    expect(await pull(settings, f.fn)).toEqual({ games: [{ match: match('b'), deviceId: 'dev2', recorder: 'Ken' }] });
+    expect(f.bodies[0]).toEqual({ op: 'pull', token: 'secret' });
+    expect(await pull(settings, fakeFetch([{ ok: false, error: 'unauthorized' }]).fn)).toEqual({ error: 'unauthorized' });
+    expect(await pull(settings, fakeFetch([{ ok: true }]).fn)).toEqual({ error: 'bad-response' });
   });
 });

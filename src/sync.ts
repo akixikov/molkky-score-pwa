@@ -25,9 +25,17 @@ export interface SyncStatus {
   lastError?: string;
 }
 
+/** A teammate's match pulled from the sheet. Shown read-only; only its recorder's device can change it. */
+export interface RemoteGame {
+  match: Match;
+  deviceId: string;
+  recorder: string;
+}
+
 const SETTINGS_KEY = 'molkky-sync-v1';
 const QUEUE_KEY = 'molkky-sync-queue-v1';
 const STATUS_KEY = 'molkky-sync-status-v1';
+const REMOTE_KEY = 'molkky-remote-v1';
 
 export const URL_RE = /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/;
 export const emptyQueue = (): SyncQueue => ({ put: [], del: [] });
@@ -47,6 +55,8 @@ export const loadQueue = () => load<SyncQueue>(QUEUE_KEY, emptyQueue());
 export const saveQueue = (q: SyncQueue) => set(QUEUE_KEY, q);
 export const loadStatus = () => load<SyncStatus>(STATUS_KEY, {});
 export const saveStatus = (s: SyncStatus) => set(STATUS_KEY, s);
+export const loadRemote = () => load<RemoteGame[]>(REMOTE_KEY, []);
+export const saveRemote = (r: RemoteGame[]) => set(REMOTE_KEY, r);
 
 /** Adds changed and removed matches to the queue. A match changed several times is sent once. */
 export function queueChanges(q: SyncQueue, prev: Match[], next: Match[]): SyncQueue {
@@ -140,6 +150,34 @@ export function afterFlush(q: SyncQueue, r: FlushResult, matches: Match[]): Sync
   ]);
   const deleted = new Set([...r.deleted.filter((id) => !current.has(id)), ...r.refused]);
   return { put: q.put.filter((id) => !done.has(id)), del: q.del.filter((id) => !deleted.has(id)) };
+}
+
+/** Minimal shape check so a malformed row on the sheet cannot break the app. */
+function isMatch(m: unknown): m is Match {
+  const x = m as Match | null;
+  return !!x && typeof x.id === 'string' && typeof x.date === 'string' && Array.isArray(x.sets)
+    && x.sets.every((st) => !!st && Array.isArray(st.records) && !!st.config && Array.isArray(st.config.lineup));
+}
+
+/**
+ * Teammates' matches from a pull: everything on the sheet except this device's own matches
+ * (the device is the source of truth for those) and deleted ones. The pull is the full list,
+ * so it replaces what was pulled before.
+ */
+export function fromPull(games: unknown, myDeviceId: string): RemoteGame[] | null {
+  if (!Array.isArray(games)) return null;
+  return games.flatMap((g) => {
+    const x = g as { deviceId?: unknown; recorder?: unknown; deletedAt?: unknown; match?: unknown };
+    if (typeof x.deviceId !== 'string' || x.deviceId === myDeviceId || x.deletedAt || !isMatch(x.match)) return [];
+    return [{ match: x.match, deviceId: x.deviceId, recorder: typeof x.recorder === 'string' ? x.recorder : '' }];
+  });
+}
+
+export async function pull(s: SyncSettings, fetchImpl?: Fetch): Promise<{ games?: RemoteGame[]; error?: string }> {
+  const r = await call(s.url, { op: 'pull', token: s.token }, fetchImpl);
+  if (!r.ok) return { error: r.error };
+  const games = fromPull(r.games, s.deviceId);
+  return games ? { games } : { error: 'bad-response' };
 }
 
 /** User-facing text for an error code from the web app or the network. */

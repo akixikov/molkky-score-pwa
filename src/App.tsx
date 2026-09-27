@@ -10,9 +10,9 @@ import {
   type AppData, type Match, type SetEntry,
 } from './store';
 import {
-  afterFlush, emptyQueue, errorText, flush, isConfigured, loadQueue, loadSettings, loadStatus, newSettings, ping,
-  queueAll, queueChanges, saveQueue, saveSettings, saveStatus, URL_RE,
-  type SyncQueue, type SyncSettings, type SyncStatus,
+  afterFlush, emptyQueue, errorText, flush, isConfigured, loadQueue, loadRemote, loadSettings, loadStatus, newSettings, ping,
+  pull, queueAll, queueChanges, saveQueue, saveRemote, saveSettings, saveStatus, URL_RE,
+  type RemoteGame, type SyncQueue, type SyncSettings, type SyncStatus,
 } from './sync';
 
 type Screen =
@@ -62,10 +62,12 @@ export default function App() {
   };
 
   if (!data) return <div className="screen">Loading…</div>;
+  // Own matches plus teammates' (read-only), for lists and review.
+  const all = [...data.matches, ...sync.remote.map((g) => ({ ...g.match, remoteBy: g.recorder || 'a teammate' }))];
 
   switch (screen.name) {
     case 'home':
-      return <Home data={data} update={update} go={setScreen} sync={sync} />;
+      return <Home data={data} all={all} update={update} go={setScreen} sync={sync} />;
     case 'sync':
       return <TeamSync sync={sync} matches={data.matches} go={setScreen} />;
     case 'new':
@@ -73,15 +75,15 @@ export default function App() {
     case 'practice':
       return <PracticeSetup data={data} update={update} go={setScreen} />;
     case 'review':
-      return <Review data={data} go={setScreen} />;
+      return <Review matches={all} go={setScreen} />;
     case 'play': {
       const m = data.matches.find((x) => x.id === screen.matchId);
-      if (!m) return <Home data={data} update={update} go={setScreen} sync={sync} />;
+      if (!m) return <Home data={data} all={all} update={update} go={setScreen} sync={sync} />;
       return <Play match={m} data={data} update={update} go={setScreen} />;
     }
     case 'match': {
-      const m = data.matches.find((x) => x.id === screen.matchId);
-      if (!m) return <Home data={data} update={update} go={setScreen} sync={sync} />;
+      const m = all.find((x) => x.id === screen.matchId);
+      if (!m) return <Home data={data} all={all} update={update} go={setScreen} sync={sync} />;
       return <MatchSummary match={m} update={update} go={setScreen} />;
     }
   }
@@ -96,23 +98,30 @@ interface Sync {
   settings: SyncSettings | null;
   queue: SyncQueue;
   status: SyncStatus;
+  /** Teammates' matches from the last pull. */
+  remote: RemoteGame[];
   busy: boolean;
   onChange: (prev: AppData, next: AppData) => void;
   save: (s: SyncSettings) => void;
-  run: () => Promise<void>;
+  /** Sends the queue, then pulls teammates' matches (at most once a minute unless forced). */
+  run: (forcePull?: boolean) => Promise<void>;
   sendAll: () => void;
 }
 
+const PULL_EVERY_MS = 60_000;
+
 /**
- * Keeps the unsent queue and sends it to the team spreadsheet: shortly after each change,
- * when the app starts or comes back to the foreground, and when the device goes online.
+ * Keeps the unsent queue and sends it to the team spreadsheet, then pulls teammates' matches:
+ * shortly after each change, when the app starts or comes back to the foreground, and when
+ * the device goes online.
  */
 function useTeamSync(getMatches: () => Match[]): Sync {
   const [settings, setSettings] = useState<SyncSettings | null>(null);
   const [queue, setQueue] = useState<SyncQueue>(emptyQueue());
   const [status, setStatus] = useState<SyncStatus>({});
+  const [remote, setRemote] = useState<RemoteGame[]>([]);
   const [busy, setBusy] = useState(false);
-  const ref = useRef({ settings: null as SyncSettings | null, queue: emptyQueue(), running: false, again: false, timer: 0 });
+  const ref = useRef({ settings: null as SyncSettings | null, queue: emptyQueue(), running: false, again: false, timer: 0, lastPull: 0 });
 
   const writeQueue = (q: SyncQueue) => {
     ref.current.queue = q;
@@ -125,32 +134,49 @@ function useTeamSync(getMatches: () => Match[]): Sync {
     return next;
   });
 
-  const run = async () => {
+  const run = async (forcePull = false) => {
     const s = ref.current.settings;
     if (!isConfigured(s)) return;
     if (ref.current.running) { ref.current.again = true; return; }
     const q = ref.current.queue;
-    if (q.put.length === 0 && q.del.length === 0) return;
+    const needPush = q.put.length > 0 || q.del.length > 0;
+    const needPull = forcePull || Date.now() - ref.current.lastPull > PULL_EVERY_MS;
+    if (!needPush && !needPull) return;
     ref.current.running = true;
     setBusy(true);
-    const r = await flush(s, q, getMatches());
-    writeQueue(afterFlush(ref.current.queue, r, getMatches()));
-    writeStatus((prev) => (r.error
-      ? { ...prev, lastError: r.error }
-      : { lastSync: Date.now(), lastError: r.refused.length > 0 ? 'not-owner' : undefined }));
+    let error: string | undefined;
+    let refused = false;
+    if (needPush) {
+      const r = await flush(s, q, getMatches());
+      writeQueue(afterFlush(ref.current.queue, r, getMatches()));
+      error = r.error;
+      refused = r.refused.length > 0;
+    }
+    if (!error && needPull) {
+      const p = await pull(s);
+      if (p.games) {
+        ref.current.lastPull = Date.now();
+        setRemote(p.games);
+        saveRemote(p.games);
+      } else error = p.error;
+    }
+    writeStatus((prev) => (error
+      ? { ...prev, lastError: error }
+      : { lastSync: Date.now(), lastError: refused ? 'not-owner' : undefined }));
     ref.current.running = false;
     setBusy(false);
     if (ref.current.again) { ref.current.again = false; void run(); }
   };
 
   useEffect(() => {
-    Promise.all([loadSettings(), loadQueue(), loadStatus()]).then(([s, q, st]) => {
+    Promise.all([loadSettings(), loadQueue(), loadStatus(), loadRemote()]).then(([s, q, st, rm]) => {
       ref.current.settings = s;
       ref.current.queue = q;
       setSettings(s);
       setQueue(q);
       setStatus(st);
-      if (s?.auto) void run();
+      setRemote(isConfigured(s) ? rm : []);
+      if (s?.auto) void run(true);
     });
     const retry = () => { if (ref.current.settings?.auto && document.visibilityState === 'visible') void run(); };
     window.addEventListener('online', retry);
@@ -162,7 +188,7 @@ function useTeamSync(getMatches: () => Match[]): Sync {
   }, []);
 
   return {
-    settings, queue, status, busy, run,
+    settings, queue, status, remote, busy, run,
     onChange: (prev, next) => {
       if (!isConfigured(ref.current.settings)) return;
       writeQueue(queueChanges(ref.current.queue, prev.matches, next.matches));
@@ -175,7 +201,13 @@ function useTeamSync(getMatches: () => Match[]): Sync {
       ref.current.settings = s;
       setSettings(s);
       saveSettings(s);
-      if (!isConfigured(s)) writeQueue(emptyQueue());
+      if (isConfigured(s)) void run(true);
+      else {
+        // Turning sync off also forgets teammates' matches on this device.
+        writeQueue(emptyQueue());
+        setRemote([]);
+        saveRemote([]);
+      }
     },
     sendAll: () => {
       writeQueue(queueAll(ref.current.queue, getMatches()));
@@ -194,7 +226,7 @@ const clock = (t: number) => {
 function syncSummary(sync: Sync): string {
   if (!isConfigured(sync.settings)) return 'Off';
   const pending = sync.queue.put.length + sync.queue.del.length;
-  if (sync.busy) return 'Sending…';
+  if (sync.busy) return 'Syncing…';
   if (sync.status.lastError && pending > 0) return `${pending} unsent · ${errorText(sync.status.lastError)}`;
   if (pending > 0) return `${pending} unsent`;
   return sync.status.lastSync ? `Synced ${clock(sync.status.lastSync)}` : 'On';
@@ -244,13 +276,14 @@ function TeamSync({ sync, matches, go }: { sync: Sync; matches: Match[]; go: Go 
         <div className="card col">
           <div className="strong">Status</div>
           <div>{pending} unsent · {sync.status.lastSync ? `last sync ${clock(sync.status.lastSync)}` : 'not synced yet'}</div>
+          <div className="muted">{sync.remote.length} {sync.remote.length === 1 ? 'match' : 'matches'} from teammates</div>
           {sync.status.lastError && pending > 0 && <div className="warn-text">{errorText(sync.status.lastError)}</div>}
           <div className="grid2">
-            <button className="ghost" disabled={sync.busy || pending === 0} onClick={() => void sync.run()}>{sync.busy ? 'Sending…' : 'Sync now'}</button>
+            <button className="ghost" disabled={sync.busy} onClick={() => void sync.run(true)}>{sync.busy ? 'Syncing…' : 'Sync now'}</button>
             <button className="ghost" disabled={sync.busy || matches.length === 0} onClick={sync.sendAll}>Send all my records ({matches.length})</button>
           </div>
           <div className="muted tiny">
-            New changes are sent automatically. "Send all my records" also sends matches recorded before sync was set up.
+            New changes are sent automatically, and teammates' matches are fetched when the app opens and after sending. "Send all my records" also sends matches recorded before sync was set up.
           </div>
           <button className={armed ? 'danger small' : 'link'} onClick={() => {
             if (armed) { sync.save({ ...clean, url: '', token: '' }); setForm({ ...form, url: '', token: '' }); setArmed(false); } else setArmed(true);
@@ -277,7 +310,7 @@ function patchCurrentSet(m: Match, fn: (s: SetEntry) => SetEntry): Match {
 
 const COLLAPSED_KEY = 'molkky-collapsed-groups';
 
-function Home({ data, update, go, sync }: { data: AppData; update: Update; go: Go; sync: Sync }) {
+function Home({ data, all, update, go, sync }: { data: AppData; all: Match[]; update: Update; go: Go; sync: Sync }) {
   const [armed, setArmed] = useState<string | null>(null);
   const importJson = async (file: File) => {
     try {
@@ -290,7 +323,9 @@ function Home({ data, update, go, sync }: { data: AppData; update: Update; go: G
   };
   // Newest first, grouped by tournament (same date, name and kind).
   const groups = new Map<string, Match[]>();
-  for (const m of [...data.matches].reverse()) {
+  // Teammates' matches join by date so the newest still comes first.
+  const ordered = [...all].sort((a, b) => b.date.localeCompare(a.date) || all.indexOf(b) - all.indexOf(a));
+  for (const m of ordered) {
     const key = tournamentKey(m);
     groups.set(key, [...(groups.get(key) ?? []), m]);
   }
@@ -357,7 +392,7 @@ function Home({ data, update, go, sync }: { data: AppData; update: Update; go: G
                     const names = teamNames(m);
                     return (
                       <div key={m.id} className="card row">
-                        <button className="rowmain" onClick={() => go({ name: decided ? 'match' : 'play', matchId: m.id })}>
+                        <button className="rowmain" onClick={() => go({ name: decided || m.remoteBy ? 'match' : 'play', matchId: m.id })}>
                           <div className="strong">
                             {practice
                               ? (m.sets[0].config.sides ?? []).map((x) => x.name).join(' · ')
@@ -366,8 +401,9 @@ function Home({ data, update, go, sync }: { data: AppData; update: Update; go: G
                           {!decided
                             ? <div className="sub">In progress</div>
                             : practice && winner && <div className="sub">Winner: {names[winner]}</div>}
+                          {m.remoteBy && <div className="sub">by {m.remoteBy}</div>}
                         </button>
-                        <button
+                        {!m.remoteBy && <button
                           className={armed === m.id ? 'danger small' : 'ghost small'}
                           onClick={() => {
                             if (armed === m.id) {
@@ -377,7 +413,7 @@ function Home({ data, update, go, sync }: { data: AppData; update: Update; go: G
                           }}
                         >
                           {armed === m.id ? 'Really delete' : 'Delete'}
-                        </button>
+                        </button>}
                       </div>
                     );
                   })}
@@ -400,7 +436,11 @@ function Home({ data, update, go, sync }: { data: AppData; update: Update; go: G
           <input type="file" accept="application/json" onChange={(e) => e.target.files?.[0] && importJson(e.target.files[0])} />
         </label>
       </div>
-      <div className="muted tiny">Records are stored only on this device. Back up often.</div>
+      <div className="muted tiny">
+        {isConfigured(sync.settings)
+          ? 'Records are kept on this device and sent to the team sheet.'
+          : 'Records are stored only on this device. Back up often, or set up Team sync.'}
+      </div>
     </div>
   );
 }
@@ -993,7 +1033,9 @@ function ScoreSheet({ set, names, action }: { set: SetEntry; names: Names; actio
             <tr>
               <td className="turn">Σ</td>
               {order.map((t) => (
-                <td key={t} colSpan={scoreCols(t).length + 1} className={`final ${w === t ? 'won' : ''}`}>{st.teams[t].eliminated ? 'DQ' : st.teams[t].score}</td>
+                <td key={t} colSpan={scoreCols(t).length + 1} className={`final ${w === t ? 'won' : ''}`}>
+                  {st.teams[t].eliminated ? 'DQ' : byTeam(t).length === 0 ? '—' : st.teams[t].score}
+                </td>
               ))}
             </tr>
           </tfoot>
@@ -1068,6 +1110,7 @@ function MatchSummary({ match, update, go }: { match: Match; update: Update; go:
   const won = match.sets.filter((s) => setWinner(s) === 'us').length;
   const lost = match.sets.filter((s) => setWinner(s) === 'them').length;
   const verdict = won > lost ? 'Win' : won < lost ? 'Loss' : 'Draw';
+  const readOnly = match.remoteBy && <div className="muted">Recorded by {match.remoteBy}. Only their phone can change it.</div>;
   const legend = <div className="muted tiny">× miss (incl. foul)　<span className="legend over">25</span> over 50, back to 25　<span className="legend fin">50</span> finish</div>;
 
   if (isPracticeGame(match)) {
@@ -1084,11 +1127,12 @@ function MatchSummary({ match, update, go }: { match: Match; update: Update; go:
           <div>{(set.config.sides ?? []).map((x) => x.name).join(' · ')}</div>
           <div className="result-title">{w ? `Winner: ${teamNames(match)[w]}` : 'No result'}</div>
         </div>
+        {readOnly}
         <PlayersCard title="This game" sets={match.sets} />
         <ScoreSheet set={set} names={teamNames(match)} />
         {legend}
         <div className="spacer" />
-        <button className="ghost" onClick={() => go({ name: 'play', matchId: match.id })}>Continue / fix record</button>
+        {!match.remoteBy && <button className="ghost" onClick={() => go({ name: 'play', matchId: match.id })}>Continue / fix record</button>}
       </div>
     );
   }
@@ -1104,7 +1148,8 @@ function MatchSummary({ match, update, go }: { match: Match; update: Update; go:
         <div>{match.ourTeam ? `${match.ourTeam} ` : ''}vs {match.opponent || 'Opponent'}</div>
         <div className="result-title">{verdict} {won}-{lost}</div>
       </div>
-      {editNames ? (
+      {readOnly}
+      {match.remoteBy ? null : editNames ? (
         <div className="card col">
           <label className="field">Our team<input value={match.ourTeam ?? ''} onChange={(e) => setField('ourTeam', e.target.value)} /></label>
           <label className="field">Opponent<input value={match.opponent} onChange={(e) => setField('opponent', e.target.value)} /></label>
@@ -1115,7 +1160,7 @@ function MatchSummary({ match, update, go }: { match: Match; update: Update; go:
       )}
       <TeamStatsCard title={`${teamNames(match).us} this match`} sets={match.sets} />
       {match.sets.map((set) => (
-        <ScoreSheet key={set.id} set={set} names={teamNames(match)} action={match.sets.length > 1 && (
+        <ScoreSheet key={set.id} set={set} names={teamNames(match)} action={match.sets.length > 1 && !match.remoteBy && (
           <button
             className={armed === set.id ? 'danger small' : 'ghost small'}
             onClick={() => (armed === set.id ? deleteGame(set.id) : setArmed(set.id))}
@@ -1126,7 +1171,7 @@ function MatchSummary({ match, update, go }: { match: Match; update: Update; go:
       ))}
       {legend}
       <div className="spacer" />
-      <button className="ghost" onClick={() => go({ name: 'play', matchId: match.id })}>Continue / fix record</button>
+      {!match.remoteBy && <button className="ghost" onClick={() => go({ name: 'play', matchId: match.id })}>Continue / fix record</button>}
     </div>
   );
 }
@@ -1175,7 +1220,15 @@ function TrendChart({ title, labels, hollow, series, fmt, tick, domain, sel, onS
   const x = (i: number) => (n === 1 ? PW / 2 : PAD + (i * (PW - PAD * 2)) / (n - 1));
   const y = (v: number) => T + (1 - (v - domain[0]) / (domain[1] - domain[0])) * PLOT_H;
   const ticks = [domain[0], (domain[0] + domain[1]) / 2, domain[1]];
-  const short = (t: string) => (t.length > 13 ? `${t.slice(0, 12)}…` : t);
+  // Labels are cut to fit the label area; full-width (e.g. Japanese) characters count double.
+  const short = (t: string) => {
+    let w = 0;
+    for (let i = 0; i < t.length; i++) {
+      w += t.charCodeAt(i) > 0xff ? 2 : 1;
+      if (w > 12) return `${t.slice(0, i)}…`;
+    }
+    return t;
+  };
   const validOf = (vs: number[]) => vs.map((value, i) => ({ value, i })).filter((p) => !Number.isNaN(p.value));
   // Missing values (e.g. a player who skipped a tournament) break the line.
   const pathOf = (v: { i: number; value: number }[]) =>
@@ -1426,9 +1479,9 @@ function ReviewBody({ matches }: { matches: Match[] }) {
   );
 }
 
-function Review({ data, go }: { data: AppData; go: Go }) {
+function Review({ matches: all, go }: { matches: Match[]; go: Go }) {
   const [filter, setFilter] = useState<'all' | 'tournament' | 'practice'>('all');
-  const matches = data.matches.filter((m) => filter === 'all' || m.kind === filter);
+  const matches = all.filter((m) => filter === 'all' || m.kind === filter);
   return (
     <div className="screen">
       <header className="head">
