@@ -139,7 +139,8 @@ td { padding: 6px 2px; border-top: 1px solid #EFEAE0; }
 .nowrap { white-space: nowrap; }
 
 /* Trend small multiples: one series each, recessive grid, tap a point to read it. */
-.trend svg { display: block; width: 100%; height: auto; overflow: visible; }
+.trend svg { display: block; overflow: visible; flex-shrink: 0; }
+.trend-plot { display: flex; }
 .trend .grid { stroke: #EFEAE0; stroke-width: 1; }
 .trend .tick, .trend .xlab { font-family: 'Barlow Condensed', sans-serif; font-size: 11px; fill: var(--muted); }
 .trend .tick { text-anchor: end; dominant-baseline: middle; }
@@ -151,6 +152,7 @@ td { padding: 6px 2px; border-top: 1px solid #EFEAE0; }
 .chip.on-series { border: 2px solid var(--c); background: #fff; font-weight: 700; box-shadow: inset 0 -3px 0 var(--c); }
 .trend .line { fill: none; stroke: var(--c, var(--accent)); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .trend .dot { fill: var(--c, var(--accent)); stroke: #fff; stroke-width: 2; }
+.trend .dot.open { fill: #fff; stroke: var(--c, var(--accent)); stroke-width: 2; }
 .trend .hit { fill: transparent; cursor: pointer; }
 .table-scroll { overflow-x: auto; }
 .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
@@ -160,3 +162,5 @@ td { padding: 6px 2px; border-top: 1px solid #EFEAE0; }
 .kpi td.low .strong, .kpi td.low { color: var(--warn); }
 .kpi td.high .strong { color: var(--accent); }
 .kpi th, .kpi td { vertical-align: top; }
+.trend-scroll { overflow-x: auto; flex: 1; min-width: 0; }
+.trend .xlab.on { fill: var(--text, #2B2B2B); font-weight: 700; }

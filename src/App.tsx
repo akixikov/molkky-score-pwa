@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import './App.css';
 import {
   deriveSet, hintsFor, MAX_PRACTICE_PLAYERS, other, PIN_ROWS, WIN_SCORE,
@@ -969,22 +969,44 @@ interface TrendSeries { name: string; color: string; dashed?: boolean; values: n
  * One measure across tournaments, oldest on the left, one line per series.
  * Tap a point to read every series at that tournament; the latest is shown by default.
  */
-function TrendChart({ title, labels, series, fmt, tick, domain, sel, onSelect }: {
+function TrendChart({ title, labels, hollow, series, fmt, tick, domain, sel, onSelect }: {
   title: string; labels: string[]; series: TrendSeries[];
+  /** Points drawn as open circles (practice days among tournaments). */
+  hollow?: boolean[];
   fmt: (v: number) => string; tick: (v: number) => string; domain: [number, number];
-  /** Selected tournament index, shared by the charts of one card. */
+  /** Selected date index, shared by the charts of one card. */
   sel: number | null; onSelect: (i: number) => void;
 }) {
-  const W = 320, H = 104, L = 34, R = 10, T = 8, B = 20;
   const n = labels.length;
-  const x = (i: number) => (n === 1 ? (L + W - R) / 2 : L + (i * (W - L - R)) / (n - 1));
-  const y = (v: number) => T + (1 - (v - domain[0]) / (domain[1] - domain[0])) * (H - T - B);
+  // Drawn at real pixel size: the y-axis stays put while the plot scrolls sideways once
+  // the dates no longer fit (every date keeps a vertical label).
+  const AXIS = 34, PAD = 12, T = 8, PLOT_H = 76, LABEL_H = 78, MIN_SLOT = 24;
+  const H = T + PLOT_H + LABEL_H;
+  const wrap = useRef<HTMLDivElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+  const [avail, setAvail] = useState(280);
+  useEffect(() => {
+    const el = wrap.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setAvail(el.clientWidth - AXIS));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  useEffect(() => {
+    // Open at the newest (right) end.
+    if (scroller.current) scroller.current.scrollLeft = scroller.current.scrollWidth;
+  }, [n, avail]);
+  const PW = Math.max(avail, PAD * 2 + (n - 1) * MIN_SLOT);
+  const x = (i: number) => (n === 1 ? PW / 2 : PAD + (i * (PW - PAD * 2)) / (n - 1));
+  const y = (v: number) => T + (1 - (v - domain[0]) / (domain[1] - domain[0])) * PLOT_H;
+  const ticks = [domain[0], (domain[0] + domain[1]) / 2, domain[1]];
+  const short = (t: string) => (t.length > 13 ? `${t.slice(0, 12)}…` : t);
   const validOf = (vs: number[]) => vs.map((value, i) => ({ value, i })).filter((p) => !Number.isNaN(p.value));
   // Missing values (e.g. a player who skipped a tournament) break the line.
   const pathOf = (v: { i: number; value: number }[]) =>
     v.map((p, k) => `${k && v[k - 1].i === p.i - 1 ? 'L' : 'M'}${x(p.i)},${y(p.value)}`).join(' ');
   const shown = sel ?? (n > 0 ? n - 1 : null);
-  const slot = n > 1 ? (W - L - R) / (n - 1) : W - L - R;
+  const slot = n > 1 ? (PW - PAD * 2) / (n - 1) : PW;
   return (
     <div className="trend">
       <div className="strong">{title}</div>
@@ -999,28 +1021,33 @@ function TrendChart({ title, labels, series, fmt, tick, domain, sel, onSelect }:
           ))}
         </div>
       )}
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${title} by tournament`}>
-        {[domain[0], (domain[0] + domain[1]) / 2, domain[1]].map((v) => (
-          <g key={v}>
-            <line className="grid" x1={L} x2={W - R} y1={y(v)} y2={y(v)} />
-            <text className="tick" x={L - 6} y={y(v)}>{tick(v)}</text>
-          </g>
-        ))}
-        {series.map((sr) => {
-          const v = validOf(sr.values);
-          return (
-            <g key={sr.name} style={{ '--c': sr.color } as CSSProperties}>
-              <path className={`line ${sr.dashed ? 'dashed' : ''}`} d={pathOf(v)} />
-              {v.map((p) => <circle key={p.i} className="dot" cx={x(p.i)} cy={y(p.value)} r={p.i === shown ? 5 : 3.5} />)}
-            </g>
-          );
-        })}
-        {n > 0 && <text className="xlab" x={x(0)} y={H - 4} textAnchor={n === 1 ? 'middle' : 'start'}>{labels[0]}</text>}
-        {n > 1 && <text className="xlab" x={x(n - 1)} y={H - 4} textAnchor="end">{labels[n - 1]}</text>}
-        {labels.map((_, i) => (
-          <rect key={i} className="hit" x={x(i) - slot / 2} y={0} width={slot} height={H} onClick={() => onSelect(i)} onMouseEnter={() => onSelect(i)} />
-        ))}
-      </svg>
+      <div className="trend-plot" ref={wrap}>
+        <svg width={AXIS} height={H} aria-hidden>
+          {ticks.map((v) => <text key={v} className="tick" x={AXIS - 6} y={y(v)}>{tick(v)}</text>)}
+        </svg>
+        <div className="trend-scroll" ref={scroller}>
+          <svg width={PW} height={H} role="img" aria-label={`${title} by date`}>
+            {ticks.map((v) => <line key={v} className="grid" x1={0} x2={PW} y1={y(v)} y2={y(v)} />)}
+            {series.map((sr) => {
+              const v = validOf(sr.values);
+              return (
+                <g key={sr.name} style={{ '--c': sr.color } as CSSProperties}>
+                  <path className={`line ${sr.dashed ? 'dashed' : ''}`} d={pathOf(v)} />
+                  {v.map((p) => <circle key={p.i} className={`dot ${hollow?.[p.i] ? 'open' : ''}`} cx={x(p.i)} cy={y(p.value)} r={p.i === shown ? 5 : 3.5} />)}
+                </g>
+              );
+            })}
+            {labels.map((l, i) => (
+              <text key={i} className={`xlab ${i === shown ? 'on' : ''}`} transform={`translate(${x(i) + 4},${T + PLOT_H + 6}) rotate(-90)`} textAnchor="end">
+                {short(l)}
+              </text>
+            ))}
+            {labels.map((_, i) => (
+              <rect key={i} className="hit" x={x(i) - slot / 2} y={0} width={slot} height={H} onClick={() => onSelect(i)} onMouseEnter={() => onSelect(i)} />
+            ))}
+          </svg>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1060,11 +1087,16 @@ const kpiFmt = (k: Kpi, v: number, digits = 0) => (k.num ? (Number.isNaN(v) ? '�
 const kpiGap = (k: Kpi) => (k.num ? 0.5 : 0.05);
 const MIN_N = 5;
 
+/** Our throws in a match: our side in tournaments; every side in practice games (all are our players). */
+const ourRows = (m: Match): DerivedThrow[] =>
+  m.sets.flatMap((x) => deriveSet(x.config, x.records).rows.filter((r) => (isPracticeGame(m) ? !!r.player : r.team === 'us')));
+
 /**
- * Tournaments review: pick the team and any players once; the KPI table and the trend both follow.
+ * Review of tournaments and practice alike: pick the team and any players once; the KPI table and
+ * the trend both follow. Each tournament or practice session is one point in time.
  * ▼ marks where a player is clearly below the team — the individual's focus.
  */
-function TournamentReview({ matches }: { matches: Match[] }) {
+function ReviewBody({ matches }: { matches: Match[] }) {
   const [period, setPeriod] = useState<string>('');
   const [showTeam, setShowTeam] = useState(true);
   const [picked, setPicked] = useState<{ name: string; slot: number }[]>([]);
@@ -1072,17 +1104,18 @@ function TournamentReview({ matches }: { matches: Match[] }) {
 
   const groups = new Map<string, Match[]>();
   for (const m of [...matches].sort((a, b) => a.date.localeCompare(b.date))) {
-    const key = `${m.date} ${m.tournament}`;
+    const key = tournamentKey(m);
     groups.set(key, [...(groups.get(key) ?? []), m]);
   }
   const tours = [...groups].map(([key, ms]) => ({
     key,
-    label: `${ms[0].date.slice(5)} ${ms[0].tournament || '(no name)'}`,
+    practice: ms[0].kind === 'practice',
+    label: `${ms[0].date.slice(5)} ${ms[0].tournament || (ms[0].kind === 'practice' ? 'Practice' : '(no name)')}`,
     matches: ms.length,
     games: ms.reduce((a, m) => a + m.sets.length, 0),
-    rows: ms.flatMap((m) => m.sets).flatMap((x) => deriveSet(x.config, x.records).rows.filter((r) => r.team === 'us')),
+    rows: ms.flatMap(ourRows),
   }));
-  if (tours.length === 0) return <div className="muted">No tournament matches yet.</div>;
+  if (tours.length === 0) return <div className="muted">Nothing recorded yet.</div>;
 
   // Players, most throws first.
   const counts = new Map<string, number>();
@@ -1101,9 +1134,10 @@ function TournamentReview({ matches }: { matches: Match[] }) {
   ];
   const swatch = (l: { color: string; dashed: boolean }) => <span className={`swatch ${l.dashed ? 'dashed' : ''}`} style={{ '--c': l.color } as CSSProperties} />;
 
-  const inPeriod = period ? tours.filter((t) => t.key === period) : tours;
+  const current = tours.some((t) => t.key === period) ? period : '';
+  const inPeriod = current ? tours.filter((t) => t.key === current) : tours;
   const periodRows = inPeriod.flatMap((t) => t.rows);
-  const selIdx = period ? tours.findIndex((t) => t.key === period) : null;
+  const selIdx = current ? tours.findIndex((t) => t.key === current) : null;
   const kpi = KPIS.find((k) => k.key === kpiKey) ?? KPIS[0];
 
   const trendValues = (only: (r: DerivedThrow) => boolean) => tours.map((t) => kpi.pick(t.rows.filter(only)).v);
@@ -1127,19 +1161,19 @@ function TournamentReview({ matches }: { matches: Match[] }) {
             );
           })}
         </div>
-        <select value={period} onChange={(e) => setPeriod(e.target.value)}>
-          <option value="">All tournaments</option>
-          {[...tours].reverse().map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+        <select value={current} onChange={(e) => setPeriod(e.target.value)}>
+          <option value="">All dates</option>
+          {[...tours].reverse().map((t) => <option key={t.key} value={t.key}>{t.label}{t.practice ? ' (practice)' : ''}</option>)}
         </select>
         <div className="muted tiny">
-          {inPeriod.reduce((a, t) => a + t.matches, 0)} matches · {inPeriod.reduce((a, t) => a + t.games, 0)} games · {periodRows.length} throws
+          {inPeriod.reduce((a, t) => a + t.games, 0)} games · {periodRows.length} throws
         </div>
       </div>
 
       {lines.length === 0 ? <div className="muted">Pick Team or players.</div> : (
         <>
           <div className="card col">
-            <div className="strong">Key numbers{period ? ` · ${tours[selIdx ?? 0].label}` : ''}</div>
+            <div className="strong">Key numbers{current ? ` · ${tours[selIdx ?? 0].label}` : ''}</div>
             <div className="table-scroll">
               <table className="kpi">
                 <thead>
@@ -1179,7 +1213,7 @@ function TournamentReview({ matches }: { matches: Match[] }) {
           </div>
 
           <div className="card col">
-            <div className="strong">Trend by tournament</div>
+            <div className="strong">Trend</div>
             <div className="chips">
               {KPIS.map((k) => <button key={k.key} className={`chip ${k.key === kpiKey ? 'on' : ''}`} onClick={() => setKpiKey(k.key)}>{k.label}</button>)}
             </div>
@@ -1187,19 +1221,20 @@ function TournamentReview({ matches }: { matches: Match[] }) {
             <TrendChart
               title={kpi.label}
               labels={tours.map((t) => t.label)}
+              hollow={tours.some((t) => !t.practice) ? tours.map((t) => t.practice) : undefined}
               series={lines.map((l) => ({ name: l.name, color: l.color, dashed: l.dashed, values: trendValues(l.only) }))}
               fmt={(v) => kpiFmt(kpi, v, 1)} tick={(v) => (kpi.num ? v.toFixed(0) : pct(v, 0))}
               domain={domain}
               sel={selIdx} onSelect={(i) => setPeriod(tours[i].key)}
             />
-            <div className="muted tiny">Tap a point to show that tournament in Key numbers; choose "All tournaments" above to go back.</div>
+            <div className="muted tiny">One point per tournament or practice day{tours.some((t) => t.practice) && tours.some((t) => !t.practice) ? ' (open circles = practice)' : ''}. Tap a point to show it in Key numbers; choose "All dates" above to go back.</div>
             <div className="table-scroll">
               <table>
-                <thead><tr><th>Tournament</th>{lines.map((l) => <th key={l.name} className="nowrap">{swatch(l)} {l.name}</th>)}</tr></thead>
+                <thead><tr><th>Date</th>{lines.map((l) => <th key={l.name} className="nowrap">{swatch(l)} {l.name}</th>)}</tr></thead>
                 <tbody>
                   {[...tours].reverse().map((t) => (
                     <tr key={t.key}>
-                      <td>{t.label}</td>
+                      <td>{t.label}{t.practice && <div className="muted tiny">Practice</div>}</td>
                       {lines.map((l) => {
                         const { v, n } = kpi.pick(t.rows.filter(l.only));
                         return <td key={l.name}>{kpiFmt(kpi, v)}<div className="muted tiny">{n}</div></td>;
@@ -1217,46 +1252,20 @@ function TournamentReview({ matches }: { matches: Match[] }) {
 }
 
 function Review({ data, go }: { data: AppData; go: Go }) {
-  const [scope, setScope] = useState<'tournament' | 'practice'>('tournament');
-  const [session, setSession] = useState<string>('');
-  const tournamentMatches = data.matches.filter((m) => m.kind === 'tournament');
-  const header = (
-    <>
+  const [filter, setFilter] = useState<'all' | 'tournament' | 'practice'>('all');
+  const matches = data.matches.filter((m) => filter === 'all' || m.kind === filter);
+  return (
+    <div className="screen">
       <header className="head">
         <button className="link" onClick={() => go({ name: 'home' })}>← Back</button>
         <h1>Review</h1>
       </header>
       <div className="seg">
-        <button className={scope === 'tournament' ? 'on' : ''} onClick={() => setScope('tournament')}>Tournaments</button>
-        <button className={scope === 'practice' ? 'on' : ''} onClick={() => setScope('practice')}>Practice</button>
+        <button className={filter === 'all' ? 'on' : ''} onClick={() => setFilter('all')}>All</button>
+        <button className={filter === 'tournament' ? 'on' : ''} onClick={() => setFilter('tournament')}>Tournaments</button>
+        <button className={filter === 'practice' ? 'on' : ''} onClick={() => setFilter('practice')}>Practice</button>
       </div>
-    </>
-  );
-
-  if (scope === 'practice') {
-    // Every practice game, including older practice matches against an opponent.
-    const practiceMatches = data.matches.filter((m) => m.kind === 'practice');
-    const sessions = [...new Set(practiceMatches.map((m) => `${m.date} ${m.tournament}`.trim()))].reverse();
-    const practiceSets = practiceMatches
-      .filter((m) => !session || `${m.date} ${m.tournament}`.trim() === session)
-      .flatMap((m) => m.sets);
-    return (
-      <div className="screen">
-        {header}
-        <select value={session} onChange={(e) => setSession(e.target.value)}>
-          <option value="">All days</option>
-          {sessions.map((t) => <option key={t}>{t}</option>)}
-        </select>
-        <div className="muted">{practiceSets.length} games</div>
-        <PlayersCard title="By player" sets={practiceSets} />
-      </div>
-    );
-  }
-
-  return (
-    <div className="screen">
-      {header}
-      <TournamentReview matches={tournamentMatches} />
+      <ReviewBody matches={matches} />
     </div>
   );
 }
