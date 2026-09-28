@@ -23,3 +23,7 @@ npm run build
 
 `main` に push すると GitHub Actions がテスト→ビルド→ GitHub Pages に公開します
 （リポジトリの Settings → Pages → Source を「GitHub Actions」に設定）。
+
+## ライセンス
+
+[MIT](LICENSE)
