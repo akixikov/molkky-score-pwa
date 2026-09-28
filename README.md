@@ -12,7 +12,7 @@
 
 ```sh
 npm install
-npm run dev        # http://localhost:5173/molkky-score-pwa/
+npm run dev        # http://localhost:5173/<リポジトリ名>/（package.json の name から決まる）
 npm test           # テスト（Node 22.12 以上。`.nvmrc` は 22）
 npm run build
 ```
