@@ -24,6 +24,9 @@ npm run build
 `main` に push すると GitHub Actions がテスト→ビルド→ GitHub Pages に公開します
 （リポジトリの Settings → Pages → Source を「GitHub Actions」に設定）。
 
+フォークして別の場所に公開する場合は、リポジトリ名を変えたなら `package.json` の
+`name` も同じ名前に変更してください（GitHub Pages の公開パスはこの値から決まります）。
+
 ## ライセンス
 
 [MIT](LICENSE)

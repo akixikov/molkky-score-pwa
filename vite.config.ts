@@ -1,10 +1,14 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import pkg from './package.json' with { type: 'json' }
 
-// Served from https://<user>.github.io/molkky-score-pwa/
+// GitHub Pages serves a repo at https://<user>.github.io/<repo>/, so the base
+// path follows package.json's name. Forking this repo under a different name?
+// Rename it there (and on GitHub, if you also renamed the repo) and this
+// picks it up automatically — no edit needed here.
 export default defineConfig({
-  base: '/molkky-score-pwa/',
+  base: `/${pkg.name}/`,
   plugins: [
     react(),
     VitePWA({

@@ -38,7 +38,7 @@ export function TeamSync({ sync, matches, go }: { sync: Sync; matches: Match[]; 
         </label>
         {form.url.trim() && !urlOk && <div className="muted tiny warn-text">The URL should start with https://script.google.com/macros/s/ and end with /exec.</div>}
         <label className="field">Passphrase<input type="password" value={form.token} onChange={field('token')} autoCapitalize="off" autoCorrect="off" /></label>
-        <label className="field">Your name<input value={form.recorder} onChange={field('recorder')} placeholder="Shown to teammates, e.g. Aki" /></label>
+        <label className="field">Your name<input value={form.recorder} onChange={field('recorder')} placeholder="Shown to teammates" /></label>
         <label className="inline check"><input type="checkbox" checked={form.auto} onChange={(e) => setForm({ ...form, auto: e.target.checked })} /> Sync automatically</label>
         <div className="grid2">
           <button className="ghost" disabled={!urlOk || !clean.token} onClick={testConnection}>Test connection</button>

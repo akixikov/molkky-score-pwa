@@ -15,7 +15,7 @@
 - `src/sync.ts` — チーム共有シートとの同期（設定・未送信キュー・送信・取り込み）。設定と合言葉は本体データ・バックアップと別に保存。`src/useTeamSync.ts` が画面側の状態
 - `apps-script/Code.gs` — チームのシートに貼る Apps Script（ウェブアプリ）。`src/appsScript.test.ts` が同じコードを擬似シートで検証する
 - `src/App.tsx` — 画面の切り替えだけ。`src/screens/`（Home・NewMatch・PracticeSetup・Play・SetEnd・MatchSummary・Review・TeamSync）、`src/components/`（ScoreSheet・TrendChart など）、`src/ui.ts`（遷移の型と共通ヘルパー）、`App.css`
-- `vite.config.ts` — base `/molkky-score-pwa/`、vite-plugin-pwa
+- `vite.config.ts` — base は `package.json` の `name` から自動生成（フォークしてリポジトリ名を変えたら `package.json` の `name` も合わせる）、vite-plugin-pwa
 - `.github/workflows/deploy.yml` — test → build → Pages
 
 ## 守ること
