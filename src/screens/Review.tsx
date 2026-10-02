@@ -184,7 +184,7 @@ export function Review({ matches: all, go }: { matches: Match[]; go: Go }) {
   return (
     <div className="screen">
       <header className="head">
-        <button className="link" onClick={() => go({ name: 'home' })}>← Back</button>
+        <button className="back" onClick={() => go({ name: 'home' })}>← Back</button>
         <h1>Review</h1>
       </header>
       <div className="seg">

@@ -25,7 +25,7 @@ export function TeamSync({ sync, matches, go }: { sync: Sync; matches: Match[]; 
   return (
     <div className="screen">
       <header className="head">
-        <button className="link" onClick={() => go({ name: 'home' })}>← Back</button>
+        <button className="back" onClick={() => go({ name: 'home' })}>← Back</button>
         <h1>Team sync</h1>
       </header>
       <div className="muted">

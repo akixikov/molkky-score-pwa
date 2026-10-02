@@ -60,7 +60,7 @@ export function SetEnd({ match, set, state, winner, update, go, undo, title }: {
   if (practice) {
     return (
       <div className="screen">
-        <div className="topline"><button className="link" onClick={() => go({ name: 'home' })}>← Matches</button><span>{title}</span><span /></div>
+        <div className="topline"><button className="back" onClick={() => go({ name: 'home' })}>← Matches</button><span>{title}</span><span /></div>
         <div className="result">
           <div>Game over (auto)</div>
           <div className="result-title">{winner ? `Winner: ${names[winner]}` : 'No result'}</div>
@@ -84,7 +84,7 @@ export function SetEnd({ match, set, state, winner, update, go, undo, title }: {
 
   return (
     <div className="screen">
-      <div className="topline"><button className="link" onClick={() => go({ name: 'home' })}>← Matches</button><span>{title}</span><span /></div>
+      <div className="topline"><button className="back" onClick={() => go({ name: 'home' })}>← Matches</button><span>{title}</span><span /></div>
       <div className={`result ${winner === 'them' ? 'lose' : ''}`}>
         <div>Game over (auto)</div>
         <div className="result-title">{winner ? `Winner: ${names[winner]}` : 'No result'}</div>

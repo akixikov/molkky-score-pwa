@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { deriveSet } from '../rules';
 import { setWinner, type Match, type SetEntry } from '../store';
-import { isPracticeGame, teamNames, type Update, type Go, patchMatch } from '../ui';
+import { isPracticeGame, sidesLabel, teamNames, type Update, type Go, patchMatch } from '../ui';
 import { TeamStatsCard, PlayersCard } from '../components/StatsCards';
 import { ScoreSheet } from '../components/ScoreSheet';
 
@@ -46,12 +46,12 @@ export function MatchSummary({ match, update, go }: { match: Match; update: Upda
     return (
       <div className="screen">
         <div className="topline">
-          <button className="link" onClick={() => go({ name: 'home' })}>← Matches</button>
+          <button className="back" onClick={() => go({ name: 'home' })}>← Matches</button>
           <span>{match.tournament || 'Practice'} · {match.date}</span>
           <span />
         </div>
         <div className="result">
-          <div>{(set.config.sides ?? []).map((x) => x.name).join(' · ')}</div>
+          <div>{sidesLabel(match)}</div>
           <div className="result-title">{w ? `Winner: ${teamNames(match)[w]}` : 'No result'}</div>
         </div>
         {readOnly}
@@ -68,7 +68,7 @@ export function MatchSummary({ match, update, go }: { match: Match; update: Upda
   return (
     <div className="screen">
       <div className="topline">
-        <button className="link" onClick={() => go({ name: 'home' })}>← Matches</button>
+        <button className="back" onClick={() => go({ name: 'home' })}>← Matches</button>
         <span>{match.date} · {match.tournament || '(no tournament)'}{match.kind === 'practice' ? ' · Practice' : ''}</span>
         <span />
       </div>

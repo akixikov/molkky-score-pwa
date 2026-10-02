@@ -3,13 +3,16 @@ import { useState } from 'react';
 
 import { download, setWinner, toCsv, tournamentKey, type AppData, type Match } from '../store';
 import { isConfigured } from '../sync';
-import { today, isPracticeGame, teamNames, type Update, type Go } from '../ui';
+import { today, isPracticeGame, sidesLabel, teamNames, type Update, type Go } from '../ui';
 import { type Sync, syncSummary } from '../useTeamSync';
 
 const EXPANDED_KEY = 'molkky-expanded-groups';
+/** Groups shown per section before "Show older". */
+const RECENT_GROUPS = 5;
 
 export function Home({ data, all, update, go, sync }: { data: AppData; all: Match[]; update: Update; go: Go; sync: Sync }) {
   const [armed, setArmed] = useState<string | null>(null);
+  const [showOlder, setShowOlder] = useState<Set<string>>(new Set());
   const importJson = async (file: File) => {
     try {
       const parsed = JSON.parse(await file.text()) as AppData;
@@ -52,21 +55,34 @@ export function Home({ data, all, update, go, sync }: { data: AppData; all: Matc
       <header className="head">
         <h1>Mölkky Scorer</h1>
       </header>
-      <div className="grid2">
-        <button className="primary big" onClick={() => go({ name: 'new' })}>New match</button>
-        <button className="ghost big" onClick={() => go({ name: 'practice' })}>Practice game</button>
-      </div>
+      {/* The three ways in, as one row of matching tiles. */}
+      <nav className="actions">
+        <button className="action main" onClick={() => go({ name: 'new' })}>
+          <svg viewBox="0 0 24 24" aria-hidden><path d="M12 5v14M5 12h14" /></svg>
+          New match
+        </button>
+        <button className="action" onClick={() => go({ name: 'practice' })}>
+          <svg viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /></svg>
+          Practice
+        </button>
+        <button className="action" onClick={() => go({ name: 'review' })}>
+          <svg viewBox="0 0 24 24" aria-hidden><path d="M4 19h16M7 15l4-4 3 3 5-6" /></svg>
+          Review
+        </button>
+      </nav>
       {(['tournament', 'practice'] as const).map((kind) => {
         const list = [...groups].filter(([, ms]) => ms[0].kind === kind);
+        const older = showOlder.has(kind) ? 0 : Math.max(0, list.length - RECENT_GROUPS);
         return (
-          <section key={kind} className="col">
+          <section key={kind} className="col gap4">
             <h2 className="section-title">{kind === 'tournament' ? 'Tournaments' : 'Practice'}</h2>
             {list.length === 0 && <div className="muted">{kind === 'tournament' ? 'No matches yet.' : 'No practice games yet.'}</div>}
-            {list.map(([key, ms]) => {
+            {list.slice(0, list.length - older).map(([key, ms]) => {
               const first = ms[0];
               const rs = ms.map(result).filter((r) => r.decided);
               const w = rs.filter((r) => r.won > r.lost).length;
               const l = rs.filter((r) => r.won < r.lost).length;
+              const dr = rs.length - w - l;
               const isOpen = expanded.has(key);
               return (
                 <section key={key} className="list">
@@ -78,56 +94,73 @@ export function Home({ data, all, update, go, sync }: { data: AppData; all: Matc
                         <span className="strong">{first.tournament || (first.kind === 'practice' ? 'Practice' : '(no tournament)')}</span>
                       </div>
                     </div>
-                    <div className="sub">
+                    <div className="sub nowrap">
                       {ms.every(isPracticeGame)
                         ? `${ms.length} ${ms.length === 1 ? 'game' : 'games'}`
-                        : `${ms.length} ${ms.length === 1 ? 'match' : 'matches'} · ${w}W ${l}L`}
+                        : `${ms.length} ${ms.length === 1 ? 'match' : 'matches'} · ${w}W ${dr}D ${l}L`}
                     </div>
                   </button>
-                  {isOpen && ms.map((m) => {
-                    const { won, lost, winner, decided } = result(m);
-                    const practice = isPracticeGame(m);
-                    const names = teamNames(m);
-                    const confirming = armed === m.id;
-                    return (
-                      <div key={m.id} className={`card row ${confirming && m.remoteBy ? 'confirm-other' : ''}`}>
-                        <button className="rowmain" onClick={() => go({ name: decided || m.remoteBy ? 'match' : 'play', matchId: m.id })}>
-                          <div className="strong">
-                            {practice
-                              ? (m.sets[0].config.sides ?? []).map((x) => x.name).join(' · ')
-                              : `vs ${m.opponent || 'Opponent'}  ${won}-${lost}`}
+                  {isOpen && (
+                    <div className="card games">
+                      {ms.map((m, i) => {
+                        const { won, lost, winner, decided } = result(m);
+                        const practice = isPracticeGame(m);
+                        const names = teamNames(m);
+                        const confirming = armed === m.id;
+                        const badge = !decided ? { cls: 'live', text: 'Live' }
+                          : practice ? null
+                          : won > lost ? { cls: 'win', text: `W ${won}-${lost}` }
+                          : won < lost ? { cls: 'loss', text: `L ${won}-${lost}` }
+                          : { cls: '', text: `D ${won}-${lost}` };
+                        return (
+                          <div key={m.id} className={`game-row ${confirming && m.remoteBy ? 'confirm-other' : ''}`}>
+                            <button className="rowmain" onClick={() => go({ name: decided || m.remoteBy ? 'match' : 'play', matchId: m.id })}>
+                              {/* Newest first, so the first row is the highest game number. */}
+                              {practice && <span className="game-no">{ms.length - i}</span>}
+                              <span className="grow col gap4">
+                                <span className="strong ellipsis">
+                                  {practice ? sidesLabel(m) : `vs ${m.opponent || 'Opponent'}`}
+                                </span>
+                                {(practice && winner || m.remoteBy) && (
+                                  <span className="sub">
+                                    {[practice && winner && `Winner: ${names[winner]}`, m.remoteBy && `by ${m.remoteBy}`].filter(Boolean).join(' · ')}
+                                  </span>
+                                )}
+                                {confirming && m.remoteBy && (
+                                  <span className="warn-text tiny">Recorded on {m.remoteBy}'s phone. Deleting removes it for everyone.</span>
+                                )}
+                              </span>
+                              {badge && <span className={`badge ${badge.cls}`}>{badge.text}</span>}
+                            </button>
+                            <button
+                              className={confirming ? 'danger small' : 'ghost small'}
+                              onClick={() => {
+                                if (!confirming) { setArmed(m.id); return; }
+                                // Own matches go through the normal change queue; a teammate's is deleted on the sheet.
+                                if (m.remoteBy) sync.deleteOther(m.id);
+                                else update((d) => ({ ...d, matches: d.matches.filter((x) => x.id !== m.id) }));
+                                setArmed(null);
+                              }}
+                            >
+                              {confirming ? (m.remoteBy ? 'Delete for all' : 'Really delete') : 'Delete'}
+                            </button>
                           </div>
-                          {!decided
-                            ? <div className="sub">In progress</div>
-                            : practice && winner && <div className="sub">Winner: {names[winner]}</div>}
-                          {m.remoteBy && <div className="sub">by {m.remoteBy}</div>}
-                          {confirming && m.remoteBy && (
-                            <div className="warn-text tiny">Recorded on {m.remoteBy}'s phone. Deleting removes it for everyone.</div>
-                          )}
-                        </button>
-                        <button
-                          className={confirming ? 'danger small' : 'ghost small'}
-                          onClick={() => {
-                            if (!confirming) { setArmed(m.id); return; }
-                            // Own matches go through the normal change queue; a teammate's is deleted on the sheet.
-                            if (m.remoteBy) sync.deleteOther(m.id);
-                            else update((d) => ({ ...d, matches: d.matches.filter((x) => x.id !== m.id) }));
-                            setArmed(null);
-                          }}
-                        >
-                          {confirming ? (m.remoteBy ? 'Delete for all' : 'Really delete') : 'Delete'}
-                        </button>
-                      </div>
-                    );
-                  })}
+                        );
+                      })}
+                    </div>
+                  )}
                 </section>
               );
             })}
+            {older > 0 && (
+              <button className="link more" onClick={() => setShowOlder(new Set([...showOlder, kind]))}>
+                Show {older} older {kind === 'tournament' ? (older === 1 ? 'tournament' : 'tournaments') : (older === 1 ? 'day' : 'days')}
+              </button>
+            )}
           </section>
         );
       })}
       <div className="spacer" />
-      <button className="primary big" onClick={() => go({ name: 'review' })}>Review</button>
       <button className="ghost sync-row" onClick={() => go({ name: 'sync' })}>
         <span>Team sync</span><span className="muted">{syncSummary(sync)}</span>
       </button>

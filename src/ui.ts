@@ -26,6 +26,9 @@ export const teamNames = (m: Match): Names => {
   return sides ? Object.fromEntries(sides.map((x) => [x.id, x.name])) : namesOf(m.ourTeam, m.opponent);
 };
 
+/** Practice game line-up, e.g. "A & B vs C & D". */
+export const sidesLabel = (m: Match) => (m.sets[0]?.config.sides ?? []).map((x) => x.name).join(' vs ');
+
 /** Names of sides disqualified in a game, for end-of-game labels. */
 export const dqNames = (st: SetState, names: Names) => st.order.filter((x) => st.teams[x.id].eliminated).map((x) => names[x.id]).join(', ');
 

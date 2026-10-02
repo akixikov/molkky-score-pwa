@@ -25,7 +25,6 @@ h1 { margin: 0; font-size: 22px; font-weight: 700; }
 .grid3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
 .list { display: flex; flex-direction: column; gap: 8px; }
-.row { display: flex; align-items: center; gap: 8px; padding: 0 10px 0 0; }
 .rowmain { flex: 1; text-align: left; background: none; border: none; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
 .topline { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted); gap: 8px; }
 .table-scroll { overflow-x: auto; }
@@ -44,6 +43,10 @@ button:disabled { opacity: .4; cursor: default; }
 .small { min-height: 36px; padding: 0 12px; font-size: 13px; border-radius: 10px; }
 .danger { background: var(--warn); color: #fff; border: none; }
 .link { background: none; border: none; color: var(--accent); font-weight: 700; padding: 0; min-height: 0; text-align: left; font-size: 14px; }
+/* Back to the home screen: a large pill, easy to hit with a thumb. */
+.back { align-self: flex-start; flex: none; min-height: 44px; padding: 0 16px 0 12px; border-radius: 22px; background: #fff; border: 1px solid var(--btnline);
+  color: var(--accent); font-size: 15px; font-weight: 700; }
+.back:active { background: var(--soft); }
 .link.tiny { font-size: 12px; font-weight: 600; }
 .filebtn { display: flex; align-items: center; justify-content: center; border-radius: 12px; min-height: 48px; cursor: pointer; }
 .filebtn input { display: none; }
@@ -69,6 +72,29 @@ select { width: auto; }
 .chip.on-series { border: 2px solid var(--c); background: #fff; font-weight: 700; box-shadow: inset 0 -3px 0 var(--c); }
 
 /* ---------- Home ---------- */
+/* Home actions: three tiles of one shape; the main one is filled. */
+.actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.action { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 84px; padding: 10px 4px;
+  background: #fff; border: 1px solid var(--btnline); border-radius: 14px; color: var(--accent); font-size: 15px; font-weight: 700; }
+.action svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.action:active { background: var(--soft); }
+.action.main { background: var(--accent); border-color: var(--accent); color: #fff; }
+.action.main:active { background: var(--accent-dark); }
+.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Games of one tournament or practice day: a single card, one compact row each. */
+.games { padding: 0; overflow: hidden; }
+.game-row { display: flex; align-items: center; gap: 8px; padding-right: 10px; }
+.game-row + .game-row { border-top: 1px solid var(--hairline); }
+.game-row .rowmain { flex-direction: row; align-items: center; gap: 10px; min-width: 0; padding: 8px 12px; min-height: 52px; }
+.game-row .rowmain .grow { min-width: 0; }
+.game-row.confirm-other { background: var(--warn-bg); }
+.game-no { flex: none; width: 28px; height: 28px; border-radius: 14px; background: var(--soft); border: 1px solid var(--line); display: grid; place-items: center;
+  font-family: 'Barlow Condensed', sans-serif; font-size: 16px; font-weight: 700; color: var(--muted); }
+.badge { flex: none; min-width: 56px; text-align: center; font-variant-numeric: tabular-nums; padding: 2px 8px; border-radius: 10px; font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 700; background: var(--soft); color: var(--muted); }
+.badge.win { background: var(--accent); color: #fff; }
+.badge.loss { background: var(--opp-bg); color: var(--opp); }
+.badge.live { background: var(--warn-bg); color: var(--warn); }
+.more { align-self: center; padding: 8px 0; }
 .section-title { margin: 8px 0 0; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .group-head { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: none; border: none; border-bottom: 1.5px solid var(--line);
   border-radius: 0; padding: 6px 2px; min-height: 52px; color: inherit; font: inherit; }
@@ -79,7 +105,6 @@ select { width: auto; }
 .chev.open { transform: rotate(90deg); }
 .sync-row { display: flex; justify-content: space-between; align-items: center; padding: 0 14px; gap: 12px; }
 .sync-row .muted { text-align: right; }
-.row.confirm-other { border-color: var(--warn); }
 
 /* ---------- Match and practice setup ---------- */
 .lineup { display: flex; align-items: center; gap: 8px; }
