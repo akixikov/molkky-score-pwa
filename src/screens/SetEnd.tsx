@@ -4,7 +4,7 @@ import { deriveSet, other, type SetState, type SideId, type Team } from '../rule
 import { uid, type Match, type SetEntry } from '../store';
 import { isPracticeGame, teamNames, dqNames, type Update, type Go, patchMatch, patchCurrentSet } from '../ui';
 import { LineupEditor, TeamToggle } from '../components/Lineup';
-import { TeamStatsCard, PlayersCard } from '../components/StatsCards';
+import { TeamStatsCard } from '../components/StatsCards';
 
 export function SetEnd({ match, set, state, winner, update, go, undo, title }: {
   match: Match; set: SetEntry; state: SetState; winner: SideId | null;
@@ -71,7 +71,7 @@ export function SetEnd({ match, set, state, winner, update, go, undo, title }: {
             ))}
           </div>
         </div>
-        <PlayersCard title="This game" sets={[set]} />
+        {state.order.map((x) => <TeamStatsCard key={x.id} title={`${names[x.id]} this game`} sets={[set]} team={x.id} />)}
         <div className="spacer" />
         <div className="grid3">
           <button className="ghost" onClick={undo}>Fix last throw</button>

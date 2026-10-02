@@ -1,5 +1,6 @@
-// Stat cards for a game or match: our team's headline numbers and per-player tables.
-import { avgOf, finishers, hitOf, pct, throwsOf } from '../stats';
+// Stat cards for a game or match: a side's headline numbers.
+import { KPIS, avgOf, finishers, hitOf, pct, throwsOf } from '../stats';
+import { type SideId } from '../rules';
 import { type SetEntry } from '../store';
 
 function Stat({ label, value }: { label: string; value: string }) {
@@ -11,48 +12,25 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** Our team's headline stats over the given games. */
-export function TeamStatsCard({ title, sets }: { title: string; sets: SetEntry[] }) {
-  const ours = throwsOf(sets, 'us');
+/** One side's headline stats over the given games: our team in tournaments, any side in practice. */
+export function TeamStatsCard({ title, sets, team = 'us' }: { title: string; sets: SetEntry[]; team?: SideId }) {
+  const ours = throwsOf(sets, team);
   const avg = avgOf(ours).v;
   const fin = finishers(ours).map(([p, n]) => `${p} ×${n}`);
+  const zone = KPIS.find((k) => k.key === 'zone')!.pick(ours);
+  const hit = hitOf(ours);
+  // Few throws in one game, so rates also show the counts behind them.
+  const rate = (v: number, k: number, n: number, digits = 1) => (n === 0 ? '—' : `${pct(v, digits)} (${k}/${n})`);
   return (
     <div className="card col">
       <div className="strong">{title}</div>
+      {/* Same order as Key numbers in Review, then who finished. */}
       <div className="grid2">
-        <Stat label="Finisher" value={fin.length === 0 ? '—' : fin.join(', ')} />
-        <Stat label="Throws" value={String(ours.length)} />
+        <Stat label="Hit rate" value={rate(hit.v, Math.round(hit.v * hit.n), hit.n)} />
         <Stat label="Avg per throw" value={Number.isNaN(avg) ? '—' : avg.toFixed(1)} />
-        <Stat label="Miss rate" value={pct(1 - hitOf(ours).v)} />
+        <Stat label="Finishing zone" value={rate(zone.v, Math.round(zone.v * zone.n), zone.n, 0)} />
+        <Stat label="Finish" value={fin.length === 0 ? '—' : fin.join(', ')} />
       </div>
-    </div>
-  );
-}
-
-/** Every player's headline stats over the given games (practice). */
-export function PlayersCard({ title, sets }: { title: string; sets: SetEntry[] }) {
-  const rows = throwsOf(sets, null).filter((r) => r.player);
-  const players = [...new Set(rows.map((r) => r.player as string))];
-  return (
-    <div className="card col">
-      <div className="strong">{title}</div>
-      <table>
-        <thead><tr><th>Player</th><th>Throws</th><th>Avg</th><th>Miss</th><th>Finish</th></tr></thead>
-        <tbody>
-          {players.map((p) => {
-            const mine = rows.filter((r) => r.player === p);
-            return (
-              <tr key={p}>
-                <td>{p}</td>
-                <td>{mine.length}</td>
-                <td>{avgOf(mine).v.toFixed(1)}</td>
-                <td>{pct(1 - hitOf(mine).v, 0)}</td>
-                <td>{mine.filter((r) => r.event === 'Finish').length}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
     </div>
   );
 }

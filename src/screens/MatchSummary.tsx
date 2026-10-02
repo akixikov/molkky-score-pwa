@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { deriveSet } from '../rules';
 import { setWinner, type Match, type SetEntry } from '../store';
 import { isPracticeGame, sidesLabel, teamNames, type Update, type Go, patchMatch } from '../ui';
-import { TeamStatsCard, PlayersCard } from '../components/StatsCards';
+import { TeamStatsCard } from '../components/StatsCards';
 import { ScoreSheet } from '../components/ScoreSheet';
 
 export function MatchSummary({ match, update, go }: { match: Match; update: Update; go: Go }) {
@@ -55,7 +55,7 @@ export function MatchSummary({ match, update, go }: { match: Match; update: Upda
           <div className="result-title">{w ? `Winner: ${teamNames(match)[w]}` : 'No result'}</div>
         </div>
         {readOnly}
-        <PlayersCard title="This game" sets={match.sets} />
+        {(set.config.sides ?? []).map((x) => <TeamStatsCard key={x.id} title={`${x.name} this game`} sets={match.sets} team={x.id} />)}
         <ScoreSheet set={set} names={teamNames(match)} />
         {winnerPicker(set)}
         {legend}
