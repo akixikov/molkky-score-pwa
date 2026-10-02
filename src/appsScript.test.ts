@@ -43,7 +43,7 @@ const match = (id: string, scores: number[]): Match => ({
     records: scores.map((score, i) => ({ id: `${id}-t${i}`, team: i % 2 ? 'them' : 'us', player: i % 2 ? undefined : 'A', score, ts: i })),
   }],
 });
-const put = (m: Match, deviceId = 'dev1') => ({ op: 'putMatch', match: m, deviceId, recorder: 'Aki', rows: rowsForMatch(m) });
+const put = (m: Match, deviceId = 'dev1') => ({ op: 'putMatch', match: m, deviceId, recorder: 'Tester', rows: rowsForMatch(m) });
 
 let ss: FakeSpreadsheet;
 const now = new Date('2026-09-27T10:00:00Z');
@@ -67,7 +67,7 @@ describe('Code.gs', () => {
     expect(ss.sheets.Games.rows.slice(1).map((r) => r[0])).toEqual(['m1', 'm2']);
     expect(throwsFor('m1')).toHaveLength(2);
     expect(throwsFor('m2')).toHaveLength(2);
-    expect(throwsFor('m1')[0].slice(-3)).toEqual(['dev1', 'Aki', now.toISOString()]);
+    expect(throwsFor('m1')[0].slice(-3)).toEqual(['dev1', 'Tester', now.toISOString()]);
     expect(JSON.parse(String(ss.sheets.Games.rows[1][5])).sets[0].records).toHaveLength(2);
   });
 
@@ -92,7 +92,7 @@ describe('Code.gs', () => {
     gs.handle(put(match('m1', [5, 1])), ss, now);
     expect(gs.handle({ op: 'deleteMatch', matchId: 'm1', deviceId: 'dev1' }, ss, now)).toEqual({ ok: true });
     expect(throwsFor('m1')).toHaveLength(0);
-    expect(ss.sheets.Games.rows[1].slice(0, 5)).toEqual(['m1', 'dev1', 'Aki', now.toISOString(), now.toISOString()]);
+    expect(ss.sheets.Games.rows[1].slice(0, 5)).toEqual(['m1', 'dev1', 'Tester', now.toISOString(), now.toISOString()]);
     // The match data stays, so the deletion can be undone by clearing DeletedAt.
     expect(JSON.parse(String(ss.sheets.Games.rows[1][5])).id).toBe('m1');
     expect(gs.handle({ op: 'deleteMatch', matchId: 'unknown', deviceId: 'dev1' }, ss, now)).toEqual({ ok: true });

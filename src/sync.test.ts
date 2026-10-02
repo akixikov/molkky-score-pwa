@@ -14,7 +14,7 @@ const match = (id: string, updatedAt = 1): Match => ({
   }],
 });
 
-const settings: SyncSettings = { url: 'https://script.google.com/macros/s/abc_DEF-123/exec', token: 'secret', deviceId: 'dev1', recorder: 'Aki', auto: true };
+const settings: SyncSettings = { url: 'https://script.google.com/macros/s/abc_DEF-123/exec', token: 'secret', deviceId: 'dev1', recorder: 'Tester', auto: true };
 
 /** A fetch stub that answers each request with the next reply and records the bodies sent. */
 function fakeFetch(replies: (object | Error)[]) {
@@ -83,7 +83,7 @@ describe('flush', () => {
     expect(r).toMatchObject({ sent: [{ id: 'a', updatedAt: 5 }], deleted: ['gone'] });
     expect(r.error).toBeUndefined();
     expect(f.bodies[0]).toMatchObject({ op: 'deleteMatch', matchId: 'gone', token: 'secret', deviceId: 'dev1' });
-    expect(f.bodies[1]).toMatchObject({ op: 'putMatch', recorder: 'Aki', match: { id: 'a' } });
+    expect(f.bodies[1]).toMatchObject({ op: 'putMatch', recorder: 'Tester', match: { id: 'a' } });
     expect((f.bodies[1].rows as unknown[]).length).toBe(3);
   });
 
@@ -133,7 +133,7 @@ describe('URL check', () => {
 describe('pull', () => {
   it("keeps teammates' matches and leaves out this device's and deleted ones", () => {
     const games = [
-      { matchId: 'a', deviceId: 'dev1', recorder: 'Aki', deletedAt: '', match: match('a') },
+      { matchId: 'a', deviceId: 'dev1', recorder: 'Tester', deletedAt: '', match: match('a') },
       { matchId: 'b', deviceId: 'dev2', recorder: 'Ken', deletedAt: '', match: match('b') },
       { matchId: 'c', deviceId: 'dev2', recorder: 'Ken', deletedAt: '2026-09-27T10:00:00Z', match: null },
       { matchId: 'd', deviceId: 'dev3', recorder: 'Mai', deletedAt: '', match: { id: 'd' } },
