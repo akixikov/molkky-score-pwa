@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyThrow, deriveSet, sidesOf, type SetConfig, type ThrowRecord } from './rules';
+import { applyThrow, deriveSet, inTurnOrder, playableLength, sidesOf, type SetConfig, type ThrowRecord } from './rules';
 
 let seq = 0;
 const t = (team: string, score: number, player?: string): ThrowRecord => ({
@@ -125,4 +125,49 @@ describe('practice games (2–6 sides)', () => {
     expect(s.endReason).toBe('finish');
   });
 
+});
+
+describe('playableLength', () => {
+  const cfg: SetConfig = { firstTeam: 'us', lineup: ['A'] };
+
+  it('accepts a game recorded in turn', () => {
+    const recs = [t('us', 5, 'A'), t('them', 3), t('us', 7, 'A')];
+    expect(playableLength(cfg, recs)).toBe(3);
+  });
+
+  it('stops after a corrected throw that now finishes the game', () => {
+    // us: 12, 12, 12, 4, 1, then 9 to finish; them throw 3 in between.
+    const recs = [12, 12, 12, 4, 1].flatMap((x) => [t('us', x, 'A'), t('them', 3)]).concat(t('us', 9, 'A'));
+    expect(playableLength(cfg, recs)).toBe(11);
+    // Correcting the 1 to a 10 finishes there (40 + 10); the two throws after it no longer fit.
+    const early = recs.map((r, i) => (i === 8 ? { ...r, score: 10 } : r));
+    expect(deriveSet(cfg, early).winner).toBe('us');
+    expect(playableLength(cfg, early)).toBe(9);
+  });
+
+  it('stops at a throw by a side that is now disqualified', () => {
+    const sides = [{ id: 's1', name: 'A', lineup: ['A'] }, { id: 's2', name: 'B', lineup: ['B'] }, { id: 's3', name: 'C', lineup: ['C'] }];
+    const pc: SetConfig = { firstTeam: 's1', lineup: [], sides };
+    const turn = (a: number, b: number, c: number) => [t('s1', a, 'A'), t('s2', b, 'B'), t('s3', c, 'C')];
+    const recs = [...turn(0, 5, 5), ...turn(0, 5, 5), ...turn(4, 5, 5), ...turn(0, 5, 5)];
+    expect(playableLength(pc, recs)).toBe(12);
+    // A third miss in a row on turn 3 disqualifies s1, so its turn-4 throw is out of turn.
+    const fixed = recs.map((r, i) => (i === 6 ? { ...r, score: 0 } : r));
+    expect(playableLength(pc, fixed)).toBe(9);
+  });
+});
+
+describe('inTurnOrder', () => {
+  it('fills in opponent throws recorded afterwards, keeping each side in its own order', () => {
+    const cfg: SetConfig = { firstTeam: 'them', lineup: ['A', 'B'] };
+    const us = [t('us', 5, 'A'), t('us', 7, 'B'), t('us', 9, 'A')];
+    const them = [t('them', 3), t('them', 0)];
+    expect(inTurnOrder(cfg, [...us, ...them]).map((r) => r.id)).toEqual([them[0], us[0], them[1], us[1], us[2]].map((r) => r.id));
+  });
+
+  it('leaves a game recorded in turn as it is, with a disqualified side skipped', () => {
+    const sides = [{ id: 's1', name: 'A', lineup: [] }, { id: 's2', name: 'B', lineup: [] }, { id: 's3', name: 'C', lineup: [] }];
+    const recs = [t('s1', 0), t('s2', 5), t('s3', 5), t('s1', 0), t('s2', 5), t('s3', 5), t('s1', 0), t('s2', 5), t('s3', 5), t('s2', 5)];
+    expect(inTurnOrder({ firstTeam: 's1', lineup: [], sides }, recs)).toEqual(recs);
+  });
 });

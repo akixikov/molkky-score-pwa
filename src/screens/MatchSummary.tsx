@@ -1,26 +1,52 @@
-// Match result: stats, score sheets, and corrections for own matches.
+// Match result: stats, score sheets, and corrections (throws and winners also on teammates' matches).
 import { useState } from 'react';
-import { deriveSet } from '../rules';
+import { deriveSet, type ThrowRecord } from '../rules';
 import { setWinner, type Match, type SetEntry } from '../store';
-import { isPracticeGame, sidesLabel, teamNames, type Update, type Go, patchMatch } from '../ui';
+import { isPracticeGame, sidesLabel, teamNames, type Go } from '../ui';
 import { TeamStatsCard } from '../components/StatsCards';
 import { ScoreSheet } from '../components/ScoreSheet';
+import { ThrowEditor, type ThrowTarget } from '../components/ThrowEditor';
 
-export function MatchSummary({ match, update, go }: { match: Match; update: Update; go: Go }) {
+/**
+ * `edit` changes the match: an own one on this device, a teammate's through the team sheet.
+ * Without it (a teammate's match while the sheet script is too old to accept fixes) the match is read-only.
+ */
+export function MatchSummary({ match, edit: maybeEdit, go }: { match: Match; edit?: (fn: (m: Match) => Match) => void; go: Go }) {
+  const edit = maybeEdit ?? (() => {});
+  const canEdit = !!maybeEdit;
   const [armed, setArmed] = useState<string | null>(null);
   // Remove one game and renumber the rest; a match always keeps at least one game.
   const deleteGame = (id: string) => {
-    update((d) => patchMatch(d, match.id, (m) => ({
-      ...m, sets: m.sets.filter((x) => x.id !== id).map((x, i) => ({ ...x, setNo: i + 1 })),
-    })));
+    edit((m) => ({ ...m, sets: m.sets.filter((x) => x.id !== id).map((x, i) => ({ ...x, setNo: i + 1 })) }));
     setArmed(null);
   };
   const [editNames, setEditNames] = useState(false);
+  // The throw being corrected or added, if any.
+  const [fixing, setFixing] = useState<{ setId: string; target: ThrowTarget; key: number } | null>(null);
+  const open = (setId: string, target: ThrowTarget) => setFixing({ setId, target, key: Date.now() });
+  const fixThrow = (setId: string) => (canEdit ? (recordId: string) => open(setId, { recordId }) : undefined);
+  const addThrow = (setId: string) => (canEdit ? (team: string, player?: string) => open(setId, { team, player }) : undefined);
+  const patchSet = (setId: string, fn: (s: SetEntry) => SetEntry) => edit((m) => ({ ...m, sets: m.sets.map((x) => (x.id === setId ? fn(x) : x)) }));
+  const saveThrows = (set: SetEntry, records: ThrowRecord[], next: boolean) => {
+    patchSet(set.id, (x) => ({ ...x, records }));
+    if (!next || !fixing || 'recordId' in fixing.target) { setFixing(null); return; }
+    // Straight on to the same side's following throw, the lineup moving on.
+    const team = fixing.target.team;
+    const lineup = deriveSet(set.config, records).order.find((x) => x.id === team)?.lineup ?? [];
+    const count = records.filter((r) => r.team === team).length;
+    open(set.id, { team, player: lineup.length > 0 ? lineup[count % lineup.length] : undefined });
+  };
+  const fixingSet = fixing && match.sets.find((x) => x.id === fixing.setId);
+  const editor = fixing && fixingSet && (
+    <ThrowEditor key={fixing.key} set={fixingSet} target={fixing.target} names={teamNames(match)}
+      note={match.remoteBy && `Recorded on ${match.remoteBy}'s phone. Saving changes it for everyone.`}
+      onSave={(records, next) => saveThrows(fixingSet, records, next)} onClose={() => setFixing(null)} />
+  );
+  const fixHint = canEdit && <div className="muted tiny">Tap a score in the sheet to fix it, or + to add a missing throw.</div>;
   // Correct a game's winner afterwards (e.g. won on time, or the record ended early). '' = from the throws.
-  const setGameWinner = (setId: string, w: string) =>
-    update((d) => patchMatch(d, match.id, (m) => ({ ...m, sets: m.sets.map((x) => (x.id === setId ? { ...x, manualWinner: w || undefined, closed: true } : x)) })));
+  const setGameWinner = (setId: string, w: string) => patchSet(setId, (x) => ({ ...x, manualWinner: w || undefined, closed: true }));
   const winnerPicker = (set: SetEntry) => {
-    if (match.remoteBy) return null;
+    if (!canEdit) return null;
     const st = deriveSet(set.config, set.records);
     const names = teamNames(match);
     return (
@@ -33,11 +59,18 @@ export function MatchSummary({ match, update, go }: { match: Match; update: Upda
       </label>
     );
   };
-  const setField = (field: 'ourTeam' | 'opponent', v: string) => update((d) => patchMatch(d, match.id, (m) => ({ ...m, [field]: v })));
+  const setField = (field: 'ourTeam' | 'opponent', v: string) => edit((m) => ({ ...m, [field]: v }));
   const won = match.sets.filter((s) => setWinner(s) === 'us').length;
   const lost = match.sets.filter((s) => setWinner(s) === 'them').length;
   const verdict = won > lost ? 'Win' : won < lost ? 'Loss' : 'Draw';
-  const readOnly = match.remoteBy && <div className="muted">Recorded by {match.remoteBy}. Only their phone can change it.</div>;
+  const readOnly = match.remoteBy && (
+    <div className="muted">
+      Recorded by {match.remoteBy}.{' '}
+      {canEdit
+        ? 'Fixes to throws and winners go to the team sheet and reach their phone when it syncs.'
+        : "To fix it here, the team sheet's script needs updating (see the setup guide)."}
+    </div>
+  );
   const legend = <div className="muted tiny">× miss (incl. foul)　<span className="legend over">25</span> over 50, back to 25　<span className="legend fin">50</span> finish</div>;
 
   if (isPracticeGame(match)) {
@@ -56,9 +89,11 @@ export function MatchSummary({ match, update, go }: { match: Match; update: Upda
         </div>
         {readOnly}
         {(set.config.sides ?? []).map((x) => <TeamStatsCard key={x.id} title={`${x.name} this game`} sets={match.sets} team={x.id} />)}
-        <ScoreSheet set={set} names={teamNames(match)} />
+        <ScoreSheet set={set} names={teamNames(match)} onThrow={fixThrow(set.id)} onAdd={addThrow(set.id)} />
         {winnerPicker(set)}
         {legend}
+        {fixHint}
+        {editor}
         <div className="spacer" />
         {!match.remoteBy && <button className="ghost" onClick={() => go({ name: 'play', matchId: match.id })}>Continue / fix record</button>}
       </div>
@@ -89,7 +124,7 @@ export function MatchSummary({ match, update, go }: { match: Match; update: Upda
       <TeamStatsCard title={`${teamNames(match).us} this match`} sets={match.sets} />
       {match.sets.map((set) => (
         <div key={set.id} className="col gap4">
-          <ScoreSheet set={set} names={teamNames(match)} action={match.sets.length > 1 && !match.remoteBy && (
+          <ScoreSheet set={set} names={teamNames(match)} onThrow={fixThrow(set.id)} onAdd={addThrow(set.id)} action={match.sets.length > 1 && !match.remoteBy && (
             <button
               className={armed === set.id ? 'danger small' : 'ghost small'}
               onClick={() => (armed === set.id ? deleteGame(set.id) : setArmed(set.id))}
@@ -101,6 +136,8 @@ export function MatchSummary({ match, update, go }: { match: Match; update: Upda
         </div>
       ))}
       {legend}
+      {fixHint}
+      {editor}
       <div className="spacer" />
       {!match.remoteBy && <button className="ghost" onClick={() => go({ name: 'play', matchId: match.id })}>Continue / fix record</button>}
     </div>

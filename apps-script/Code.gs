@@ -2,7 +2,7 @@
 // Every member's app posts here with the shared passphrase. No sheet ID, URL or passphrase
 // lives in this file; the passphrase is kept in the script properties (menu: Set passphrase).
 
-var VERSION = 2;
+var VERSION = 3;
 var GAMES = 'Games';
 var THROWS = 'Throws';
 var GAMES_HEAD = ['MatchID', 'DeviceID', 'Recorder', 'UpdatedAt', 'DeletedAt', 'Json'];
@@ -70,18 +70,24 @@ function handle(req, ss, now) {
     if (err) return { ok: false, error: err };
     var id = req.match.id;
     var found = findGame(games, id);
-    if (found && found.values[1] !== req.deviceId) return { ok: false, error: 'not-owner' };
+    // A teammate may correct a match only when the app confirmed it with the user (force), and
+    // only one already on the sheet. The recording phone stays the owner and picks up the fix.
+    var other = found && found.values[1] !== req.deviceId;
+    if (other && req.force !== true) return { ok: false, error: 'not-owner' };
+    if (!found && req.force === true) return { ok: false, error: 'not-found' };
     // Deleted on the sheet (possibly by a teammate): the recording phone must not bring it back.
     if (found && found.values[4]) return { ok: false, error: 'deleted' };
     var body = JSON.stringify(req.match);
     if (body.length > MAX_JSON) return { ok: false, error: 'too-large' };
-    var row = [id, req.deviceId, req.recorder || '', stamp, '', body];
+    var owner = other ? found.values[1] : req.deviceId;
+    var recorder = other ? found.values[2] : req.recorder || '';
+    var row = [id, owner, recorder, stamp, '', body];
     if (found) games.getRange(found.index, 1, 1, GAMES_HEAD.length).setValues([row]);
     else games.appendRow(row);
     removeRows(throws, id);
     var values = req.rows.map(function (r) {
       return THROW_COLUMNS.map(function (c) { return r[c] === undefined ? '' : r[c]; })
-        .concat([req.deviceId, req.recorder || '', stamp]);
+        .concat([owner, recorder, stamp]);
     });
     if (values.length > 0) throws.getRange(throws.getLastRow() + 1, 1, values.length, THROWS_HEAD.length).setValues(values);
     return { ok: true, rows: values.length };
@@ -105,7 +111,8 @@ function handle(req, ss, now) {
     var list = last < 2 ? [] : games.getRange(2, 1, last - 1, GAMES_HEAD.length).getValues().map(function (r) {
       return { matchId: r[0], deviceId: r[1], recorder: r[2], updatedAt: String(r[3]), deletedAt: String(r[4]), match: r[5] ? JSON.parse(r[5]) : null };
     });
-    return { ok: true, games: list };
+    // The version tells the app whether it may send corrections to teammates' matches (3+).
+    return { ok: true, version: VERSION, games: list };
   }
 
   return { ok: false, error: 'bad-op' };

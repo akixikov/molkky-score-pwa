@@ -1,7 +1,7 @@
 import './App.css';
 import { useEffect, useRef, useState } from 'react';
-import { emptyData, loadData, saveData, stampChanged, type AppData } from './store';
-import { type Screen } from './ui';
+import { emptyData, loadData, saveData, stampChanged, type AppData, type Match } from './store';
+import { patchMatch, type Screen } from './ui';
 import { useTeamSync } from './useTeamSync';
 import { Home } from './screens/Home';
 import { TeamSync } from './screens/TeamSync';
@@ -18,8 +18,12 @@ export default function App() {
   const dataRef = useRef<AppData | null>(null);
   const sync = useTeamSync(
     () => dataRef.current?.matches ?? [],
-    // The sheet removed (teammate deleted) or brought back (undeleted there) some of this device's matches.
-    ({ remove, restore }) => update((d) => ({ ...d, matches: [...d.matches.filter((m) => !remove.includes(m.id)), ...restore] })),
+    // The sheet removed (teammate deleted), corrected (teammate fixed) or brought back (undeleted there)
+    // some of this device's matches.
+    ({ remove, restore, replace }) => update((d) => ({
+      ...d,
+      matches: [...d.matches.filter((m) => !remove.includes(m.id)).map((m) => replace.find((x) => x.id === m.id) ?? m), ...restore],
+    })),
   );
 
   useEffect(() => {
@@ -61,7 +65,10 @@ export default function App() {
     case 'match': {
       const m = all.find((x) => x.id === screen.matchId);
       if (!m) return <Home data={data} all={all} update={update} go={setScreen} sync={sync} />;
-      return <MatchSummary match={m} update={update} go={setScreen} />;
+      // A teammate's match is corrected through the team sheet (when its script allows it); an own one here.
+      const edit = !m.remoteBy ? (fn: (x: Match) => Match) => update((d) => patchMatch(d, m.id, fn))
+        : sync.canEditOthers ? (fn: (x: Match) => Match) => sync.editOther(m.id, fn) : undefined;
+      return <MatchSummary match={m} edit={edit} go={setScreen} />;
     }
   }
 }

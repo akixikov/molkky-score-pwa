@@ -169,3 +169,28 @@ export function deriveSet(config: SetConfig, records: ThrowRecord[]): SetState {
 
   return { order, teams, winner, endReason, nextTeam, nextPlayer, rows };
 }
+
+/**
+ * How many leading records still fit the rules: each throw comes from the side due next, and none
+ * follows the end of the game. A corrected throw can end a game earlier or disqualify a side sooner,
+ * which leaves later records out of turn.
+ */
+export function playableLength(config: SetConfig, records: ThrowRecord[]): number {
+  for (let i = 0; i < records.length; i++) {
+    const st = deriveSet(config, records.slice(0, i));
+    if (st.winner || st.nextTeam !== records[i].team) return i;
+  }
+  return records.length;
+}
+
+/**
+ * Records in throwing order: each side's throws keep their own order and the sides take turns,
+ * first side first, as on the score sheet. Used after a throw is added to a side's column; a side
+ * out of throws (disqualified, or not recorded) is simply skipped.
+ */
+export function inTurnOrder(config: SetConfig, records: ThrowRecord[]): ThrowRecord[] {
+  const ids = [...new Set([...sidesOf(config).map((s) => s.id), ...records.map((r) => r.team)])];
+  const cols = ids.map((id) => records.filter((r) => r.team === id));
+  const turns = Math.max(0, ...cols.map((c) => c.length));
+  return Array.from({ length: turns }, (_, i) => cols.flatMap((c) => (i < c.length ? [c[i]] : []))).flat();
+}

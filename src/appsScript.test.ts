@@ -56,7 +56,7 @@ describe('Code.gs', () => {
   });
 
   it('ping answers without touching the sheets', () => {
-    expect(gs.handle({ op: 'ping' }, ss, now)).toEqual({ ok: true, version: 2 });
+    expect(gs.handle({ op: 'ping' }, ss, now)).toEqual({ ok: true, version: 3 });
     expect(Object.keys(ss.sheets)).toEqual([]);
   });
 
@@ -86,6 +86,21 @@ describe('Code.gs', () => {
     expect(ss.sheets.Games.rows[1].slice(0, 2)).toEqual(['m1', 'dev1']);
     expect(ss.sheets.Games.rows[1][4]).toBe(now.toISOString());
     expect(gs.handle(put(match('m1', [5, 1, 7])), ss, now)).toEqual({ ok: false, error: 'deleted' });
+  });
+
+  it('a teammate may correct a match only when forced; the recording phone stays the owner', () => {
+    gs.handle(put(match('m1', [5, 1])), ss, now);
+    const fixed = { ...put(match('m1', [7, 1]), 'dev2'), recorder: 'Mate', force: true };
+    expect(gs.handle(fixed, ss, now)).toEqual({ ok: true, rows: 2 });
+    expect(ss.sheets.Games.rows[1].slice(0, 3)).toEqual(['m1', 'dev1', 'Tester']);
+    expect(JSON.parse(String(ss.sheets.Games.rows[1][5])).sets[0].records[0].score).toBe(7);
+    expect(throwsFor('m1').map((r) => [r[13], ...r.slice(-3, -1)])).toEqual([[7, 'dev1', 'Tester'], [1, 'dev1', 'Tester']]);
+    // The owner can still send its own version.
+    expect(gs.handle(put(match('m1', [9, 1])), ss, now)).toMatchObject({ ok: true });
+    // Forcing never creates a match or brings back a deleted one.
+    expect(gs.handle({ ...put(match('m9', [1]), 'dev2'), force: true }, ss, now)).toEqual({ ok: false, error: 'not-found' });
+    gs.handle({ op: 'deleteMatch', matchId: 'm1', deviceId: 'dev1' }, ss, now);
+    expect(gs.handle(fixed, ss, now)).toEqual({ ok: false, error: 'deleted' });
   });
 
   it('deleteMatch removes the throws and leaves a marker for other devices', () => {
@@ -121,11 +136,12 @@ describe('Code.gs', () => {
     gs.handle(put(match('m1', [5])), ss, now);
     gs.handle(put(match('m2', [3]), 'dev2'), ss, now);
     gs.handle({ op: 'deleteMatch', matchId: 'm1', deviceId: 'dev1' }, ss, now);
-    const r = gs.handle({ op: 'pull' }, ss, now) as { games: { matchId: string; deviceId: string; deletedAt: string; match: Match | null }[] };
+    const r = gs.handle({ op: 'pull' }, ss, now) as { version: number; games: { matchId: string; deviceId: string; deletedAt: string; match: Match | null }[] };
     expect(r.games.map((g) => [g.matchId, g.deviceId, !!g.deletedAt, g.match?.id ?? null])).toEqual([
       ['m1', 'dev1', true, 'm1'],
       ['m2', 'dev2', false, 'm2'],
     ]);
+    expect(r.version).toBe(3);
   });
 
   it('rejects unknown operations', () => {

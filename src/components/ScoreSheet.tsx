@@ -13,7 +13,13 @@ function endLabel(s: SetEntry, names: Names): string {
 }
 
 /** Paper-style score sheet of one set: one row per turn, sides in throwing order. */
-export function ScoreSheet({ set, names, action }: { set: SetEntry; names: Names; action?: ReactNode }) {
+export function ScoreSheet({ set, names, action, onThrow, onAdd }: {
+  set: SetEntry; names: Names; action?: ReactNode;
+  /** When given, tapping a throw's cell opens it for correction. */
+  onThrow?: (recordId: string) => void;
+  /** When given, a side's first blank cell adds its next throw (e.g. opponent scores filled in later). */
+  onAdd?: (team: SideId, player?: string) => void;
+}) {
   const st = deriveSet(set.config, set.records);
   const w = setWinner(set);
   const order = st.order.map((x) => x.id);
@@ -26,15 +32,30 @@ export function ScoreSheet({ set, names, action }: { set: SetEntry; names: Names
     const players = [...new Set([...lineup, ...byTeam(t).map((r) => r.player ?? '')])];
     return t === 'us' || lineup.length > 1 ? players : [''];
   };
-  const cells = (t: SideId, r: DerivedThrow | undefined) => {
+  const recorded = (t: SideId) => set.records.filter((x) => x.team === t).length;
+  // The next throw of a side, by lineup, for the blank cell's total column.
+  const nextPlayer = (t: SideId) => {
+    const lineup = st.order.find((x) => x.id === t)?.lineup ?? [];
+    return lineup.length > 0 ? lineup[recorded(t) % lineup.length] : undefined;
+  };
+  const cells = (t: SideId, r: DerivedThrow | undefined, i: number) => {
     const perPlayer = scoreCols(t)[0] !== '';
+    if (!r && onAdd && i === recorded(t)) {
+      const add = (p?: string) => ({ onClick: () => onAdd(t, p), role: 'button', 'aria-label': `Add ${names[t]} turn ${i + 1}` });
+      return [
+        ...scoreCols(t).map((p) => <td key={`${t}s${p}`} className={`fixable ${perPlayer ? 'idle' : ''}`} {...add(p || nextPlayer(t))} />),
+        <td key={`${t}t`} className="tot fixable add" {...add(nextPlayer(t))}>+</td>,
+      ];
+    }
     const miss = r?.score === 0;
+    const tap = r && onThrow ? { onClick: () => onThrow(r.id), role: 'button', 'aria-label': `Fix ${names[t]} turn ${r.teamIdx}` } : {};
+    const fix = r && onThrow ? 'fixable' : '';
     return [
       ...scoreCols(t).map((p) => (r && (!perPlayer || r.player === p)
-        ? <td key={`${t}s${p}`} className={miss ? 'miss' : ''}>{miss ? '×' : r.score}</td>
+        ? <td key={`${t}s${p}`} className={`${miss ? 'miss' : ''} ${fix}`} {...tap}>{miss ? '×' : r.score}</td>
         : <td key={`${t}s${p}`} className={perPlayer ? 'idle' : ''} />)),
       !r ? <td key={`${t}t`} className="tot" /> :
-      <td key={`${t}t`} className={`tot ${r.event === 'Over' ? 'over' : ''} ${r.event === 'Finish' ? 'fin' : ''}`}>
+      <td key={`${t}t`} className={`tot ${r.event === 'Over' ? 'over' : ''} ${r.event === 'Finish' ? 'fin' : ''} ${fix}`} {...tap}>
         {r.event === 'Eliminated' ? 'DQ' : <span>{r.after}</span>}
       </td>,
     ];
@@ -70,7 +91,7 @@ export function ScoreSheet({ set, names, action }: { set: SetEntry; names: Names
             {Array.from({ length: turns }, (_, i) => (
               <tr key={i}>
                 <td className="turn">{i + 1}</td>
-                {order.flatMap((t, k) => cells(t, cols[k][i]))}
+                {order.flatMap((t, k) => cells(t, cols[k][i], i))}
               </tr>
             ))}
           </tbody>

@@ -180,6 +180,19 @@ select { width: auto; }
 .sheet tfoot td { font-size: 22px; font-weight: 700; height: 36px; }
 .sheet .final.won { color: var(--accent); }
 
+/* Correcting a throw: cells of an own game are tappable and open a bottom panel. */
+.sheet td.fixable { cursor: pointer; }
+.sheet td.fixable:active { background: var(--soft); }
+.sheet td.add { color: var(--accent); font-weight: 700; opacity: .6; }
+.sheet-backdrop { position: fixed; inset: 0; z-index: 20; background: rgba(30, 42, 34, .35); display: flex; align-items: flex-end; justify-content: center; }
+.panel { width: 100%; max-width: 480px; background: var(--card); border-radius: 18px 18px 0 0; padding: 16px 16px max(20px, env(safe-area-inset-bottom));
+  box-shadow: 0 -4px 20px rgba(0,0,0,.12); }
+.score-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.pick { min-height: 44px; padding: 0; border-radius: 10px; border: 1.5px solid var(--btnline); background: var(--paper);
+  font-family: 'Barlow Condensed', sans-serif; font-size: 22px; font-weight: 600; }
+.pick.zero { color: var(--warn); }
+.pick.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+
 /* ---------- Review: key numbers and trend ---------- */
 /* Tap a row to chart it; ▼ marks a player clearly below the team. */
 .kpi tbody tr { cursor: pointer; }

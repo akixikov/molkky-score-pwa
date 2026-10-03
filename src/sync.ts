@@ -14,20 +14,28 @@ export interface SyncSettings {
   auto: boolean;
 }
 
-/** Matches to send (by id), own matches to delete, and teammates' matches the user chose to delete. */
+/** Matches to send (by id), own matches to delete, and teammates' matches the user chose to delete or fix. */
 export interface SyncQueue {
   put: string[];
   del: string[];
   /** Missing in queues saved before teammates' matches could be deleted. */
   delOthers?: string[];
+  /** Teammates' matches corrected on this device. Missing in queues saved before that was possible. */
+  putOthers?: string[];
 }
 
 export interface SyncStatus {
   lastSync?: number;
   lastError?: string;
+  /** Version of the sheet script at the last pull (missing before VERSION 3 reported it). */
+  sheetVersion?: number;
 }
 
-/** A teammate's match pulled from the sheet. Shown read-only; only its recorder's device can change it. */
+/** Sheet script version that accepts corrections to teammates' matches. */
+export const FIX_OTHERS_VERSION = 3;
+export const canFixOthers = (st: SyncStatus) => (st.sheetVersion ?? 0) >= FIX_OTHERS_VERSION;
+
+/** A teammate's match pulled from the sheet. Its recorder's device owns it; others may only correct it (forced). */
 export interface RemoteGame {
   match: Match;
   deviceId: string;
@@ -40,8 +48,8 @@ const STATUS_KEY = 'molkky-sync-status-v1';
 const REMOTE_KEY = 'molkky-remote-v1';
 
 export const URL_RE = /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/;
-export const emptyQueue = (): SyncQueue => ({ put: [], del: [], delOthers: [] });
-export const pendingCount = (q: SyncQueue) => q.put.length + q.del.length + (q.delOthers?.length ?? 0);
+export const emptyQueue = (): SyncQueue => ({ put: [], del: [], delOthers: [], putOthers: [] });
+export const pendingCount = (q: SyncQueue) => q.put.length + q.del.length + (q.delOthers?.length ?? 0) + (q.putOthers?.length ?? 0);
 export const newSettings = (): SyncSettings => ({ url: '', token: '', deviceId: uid(), recorder: '', auto: true });
 export const isConfigured = (s: SyncSettings | null): s is SyncSettings => !!s && URL_RE.test(s.url) && !!s.token;
 
@@ -80,10 +88,17 @@ export const queueAll = (q: SyncQueue, matches: Match[]): SyncQueue => ({
   put: [...new Set([...q.put, ...matches.map((m) => m.id)])],
 });
 
-/** Queues deleting a teammate's match (already confirmed by the user). */
+/** Queues deleting a teammate's match (already confirmed by the user). A pending fix of it is dropped. */
 export const queueDeleteOther = (q: SyncQueue, id: string): SyncQueue => ({
   ...q,
   delOthers: [...new Set([...(q.delOthers ?? []), id])],
+  putOthers: (q.putOthers ?? []).filter((x) => x !== id),
+});
+
+/** Queues sending a teammate's match corrected on this device. */
+export const queuePutOther = (q: SyncQueue, id: string): SyncQueue => ({
+  ...q,
+  putOthers: [...new Set([...(q.putOthers ?? []), id])],
 });
 
 export interface Reply {
@@ -123,23 +138,30 @@ export interface FlushResult {
   dropped: string[];
   /** Teammates' matches deleted on the sheet. */
   deletedOthers: string[];
-  /** Teammates' matches the sheet would not delete: its script predates this feature. */
+  /** Teammates' matches corrected on the sheet, with the version that was sent. */
+  sentOthers: { id: string; updatedAt?: number }[];
+  /** Teammates' matches the sheet would not delete or correct: its script predates the feature. */
   forceRefused: string[];
+  /** Teammates' corrections with nothing left to correct (deleted or gone from the sheet). */
+  lostOthers: string[];
   /** Own matches that were deleted on the sheet (by a teammate); they should go from this device too. */
   gone: string[];
   error?: string;
 }
 
-type ListKey = Exclude<keyof FlushResult, 'sent' | 'error'>;
-const emptyResult = (): FlushResult => ({ sent: [], deleted: [], refused: [], dropped: [], deletedOthers: [], forceRefused: [], gone: [] });
+type ListKey = Exclude<keyof FlushResult, 'sent' | 'sentOthers' | 'error'>;
+const emptyResult = (): FlushResult => ({
+  sent: [], deleted: [], refused: [], dropped: [], deletedOthers: [], sentOthers: [], forceRefused: [], lostOthers: [], gone: [],
+});
 
 /**
- * Sends the queue in order: own deletions, teammates' deletions, then matches. Stops at the first
- * failure that would fail every request anyway (network, passphrase).
- * onStep reports each finished item right away, so progress survives the app being closed mid-way.
+ * Sends the queue in order: own deletions, teammates' deletions, matches, then teammates' corrected
+ * matches (looked up in `others`). Stops at the first failure that would fail every request anyway
+ * (network, passphrase). onStep reports each finished item right away, so progress survives the app
+ * being closed mid-way.
  */
 export async function flush(
-  s: SyncSettings, q: SyncQueue, matches: Match[], fetchImpl?: Fetch, onStep?: (done: FlushResult) => void,
+  s: SyncSettings, q: SyncQueue, matches: Match[], fetchImpl?: Fetch, onStep?: (done: FlushResult) => void, others: Match[] = [],
 ): Promise<FlushResult> {
   const out = emptyResult();
   const step = (key: ListKey, id: string) => {
@@ -170,6 +192,17 @@ export async function flush(
     else if (r.error === 'deleted') step('gone', id);
     else return { ...out, error: r.error };
   }
+  for (const id of q.putOthers ?? []) {
+    const m = others.find((x) => x.id === id);
+    if (!m) { step('lostOthers', id); continue; }
+    const r = await call(s.url, { ...base, op: 'putMatch', recorder: s.recorder, match: m, rows: rowsForMatch(m), force: true }, fetchImpl);
+    if (r.ok) {
+      out.sentOthers.push({ id, updatedAt: m.updatedAt });
+      onStep?.({ ...emptyResult(), sentOthers: [{ id, updatedAt: m.updatedAt }] });
+    } else if (r.error === 'not-owner') step('forceRefused', id);
+    else if (r.error === 'deleted' || r.error === 'not-found') step('lostOthers', id);
+    else return { ...out, error: r.error };
+  }
   return out;
 }
 
@@ -177,7 +210,7 @@ export async function flush(
  * Removes what went through from the queue as it is now. A match changed again while it was
  * being sent stays queued, so the newer version goes out next time.
  */
-export function afterFlush(q: SyncQueue, r: FlushResult, matches: Match[]): SyncQueue {
+export function afterFlush(q: SyncQueue, r: FlushResult, matches: Match[], others: Match[] = []): SyncQueue {
   const current = new Map(matches.map((m) => [m.id, m.updatedAt]));
   const done = new Set([
     ...r.sent.filter((x) => current.get(x.id) === x.updatedAt).map((x) => x.id),
@@ -186,11 +219,18 @@ export function afterFlush(q: SyncQueue, r: FlushResult, matches: Match[]): Sync
     ...r.gone,
   ]);
   const deleted = new Set([...r.deleted.filter((id) => !current.has(id)), ...r.refused]);
-  const others = new Set([...r.deletedOthers, ...r.forceRefused]);
+  const othersDeleted = new Set([...r.deletedOthers, ...r.forceRefused]);
+  const otherNow = new Map(others.map((m) => [m.id, m.updatedAt]));
+  const othersDone = new Set([
+    ...r.sentOthers.filter((x) => otherNow.get(x.id) === x.updatedAt).map((x) => x.id),
+    ...r.forceRefused,
+    ...r.lostOthers,
+  ]);
   return {
     put: q.put.filter((id) => !done.has(id)),
     del: q.del.filter((id) => !deleted.has(id)),
-    delOthers: (q.delOthers ?? []).filter((id) => !others.has(id)),
+    delOthers: (q.delOthers ?? []).filter((id) => !othersDeleted.has(id)),
+    putOthers: (q.putOthers ?? []).filter((id) => !othersDone.has(id)),
   };
 }
 
@@ -233,7 +273,23 @@ export function ownLive(games: unknown, myDeviceId: string): Match[] {
   });
 }
 
+/**
+ * Own matches a teammate corrected on the sheet: the sheet's version is newer than this device's
+ * (whose last sent version carried its own updatedAt) and this device has nothing queued to send.
+ * Newer, not just different: a change made here while sync was off is never queued, and must not
+ * be replaced by the older version on the sheet.
+ */
+export function ownFixedElsewhere(live: Match[], mine: Match[], pendingPut: string[]): Match[] {
+  const local = new Map(mine.map((m) => [m.id, m]));
+  return live.filter((m) => {
+    const here = local.get(m.id);
+    return !!here && (m.updatedAt ?? 0) > (here.updatedAt ?? 0) && !pendingPut.includes(m.id);
+  });
+}
+
 export interface PullResult {
+  /** Version of the sheet script; 0 when it is too old to report one. */
+  version?: number;
   games?: RemoteGame[];
   ownDeleted?: string[];
   ownLive?: Match[];
@@ -244,7 +300,8 @@ export async function pull(s: SyncSettings, fetchImpl?: Fetch): Promise<PullResu
   const r = await call(s.url, { op: 'pull', token: s.token }, fetchImpl);
   if (!r.ok) return { error: r.error };
   const games = fromPull(r.games, s.deviceId);
-  return games ? { games, ownDeleted: ownDeleted(r.games, s.deviceId), ownLive: ownLive(r.games, s.deviceId) } : { error: 'bad-response' };
+  const version = typeof r.version === 'number' ? r.version : 0;
+  return games ? { version, games, ownDeleted: ownDeleted(r.games, s.deviceId), ownLive: ownLive(r.games, s.deviceId) } : { error: 'bad-response' };
 }
 
 /** User-facing text for an error code from the web app or the network. */
@@ -254,7 +311,7 @@ export function errorText(code: string | undefined): string {
     case 'network': return 'No connection. Will retry.';
     case 'bad-response': return 'Unexpected reply. Check the web app URL and that it is deployed for "Anyone".';
     case 'not-owner': return 'A match was recorded on another device and was skipped.';
-    case 'force-refused': return "Deleting a teammate's match needs the updated sheet script (see the setup guide).";
+    case 'force-refused': return "Changing a teammate's match needs the updated sheet script (see the setup guide).";
     case 'too-large': return 'A match is too large for one sheet cell.';
     case undefined: return '';
     default: return `Sync failed (${code}).`;
