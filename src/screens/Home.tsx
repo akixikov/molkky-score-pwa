@@ -11,7 +11,6 @@ const EXPANDED_KEY = 'molkky-expanded-groups';
 const RECENT_GROUPS = 5;
 
 export function Home({ data, all, update, go, sync }: { data: AppData; all: Match[]; update: Update; go: Go; sync: Sync }) {
-  const [armed, setArmed] = useState<string | null>(null);
   const [showOlder, setShowOlder] = useState<Set<string>>(new Set());
   const importJson = async (file: File) => {
     try {
@@ -106,14 +105,13 @@ export function Home({ data, all, update, go, sync }: { data: AppData; all: Matc
                         const { won, lost, winner, decided } = result(m);
                         const practice = isPracticeGame(m);
                         const names = teamNames(m);
-                        const confirming = armed === m.id;
                         const badge = !decided ? { cls: 'live', text: 'Live' }
                           : practice ? null
                           : won > lost ? { cls: 'win', text: `W ${won}-${lost}` }
                           : won < lost ? { cls: 'loss', text: `L ${won}-${lost}` }
                           : { cls: '', text: `D ${won}-${lost}` };
                         return (
-                          <div key={m.id} className={`game-row ${confirming && m.remoteBy ? 'confirm-other' : ''}`}>
+                          <div key={m.id} className="game-row">
                             <button className="rowmain" onClick={() => go({ name: decided || m.remoteBy ? 'match' : 'play', matchId: m.id })}>
                               {/* Newest first, so the first row is the highest game number. */}
                               {practice && <span className="game-no">{ms.length - i}</span>}
@@ -126,24 +124,10 @@ export function Home({ data, all, update, go, sync }: { data: AppData; all: Matc
                                     {[practice && winner && `Winner: ${names[winner]}`, m.remoteBy && `by ${m.remoteBy}`].filter(Boolean).join(' · ')}
                                   </span>
                                 )}
-                                {confirming && m.remoteBy && (
-                                  <span className="warn-text tiny">Recorded on {m.remoteBy}'s phone. Deleting removes it for everyone.</span>
-                                )}
                               </span>
                               {badge && <span className={`badge ${badge.cls}`}>{badge.text}</span>}
                             </button>
-                            <button
-                              className={confirming ? 'danger small' : 'ghost small'}
-                              onClick={() => {
-                                if (!confirming) { setArmed(m.id); return; }
-                                // Own matches go through the normal change queue; a teammate's is deleted on the sheet.
-                                if (m.remoteBy) sync.deleteOther(m.id);
-                                else update((d) => ({ ...d, matches: d.matches.filter((x) => x.id !== m.id) }));
-                                setArmed(null);
-                              }}
-                            >
-                              {confirming ? (m.remoteBy ? 'Delete for all' : 'Really delete') : 'Delete'}
-                            </button>
+                            <button className="ghost small" onClick={() => go({ name: 'match', matchId: m.id, edit: true })}>Edit</button>
                           </div>
                         );
                       })}

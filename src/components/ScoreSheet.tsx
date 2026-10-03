@@ -13,8 +13,10 @@ function endLabel(s: SetEntry, names: Names): string {
 }
 
 /** Paper-style score sheet of one set: one row per turn, sides in throwing order. */
-export function ScoreSheet({ set, names, action, onThrow, onAdd }: {
+export function ScoreSheet({ set, names, action, onThrow, onAdd, selected }: {
   set: SetEntry; names: Names; action?: ReactNode;
+  /** Highlighted cell in edit mode: a recorded throw, or a side's blank cell. */
+  selected?: { recordId?: string; team?: string };
   /** When given, tapping a throw's cell opens it for correction. */
   onThrow?: (recordId: string) => void;
   /** When given, a side's first blank cell adds its next throw (e.g. opponent scores filled in later). */
@@ -42,14 +44,15 @@ export function ScoreSheet({ set, names, action, onThrow, onAdd }: {
     const perPlayer = scoreCols(t)[0] !== '';
     if (!r && onAdd && i === recorded(t)) {
       const add = (p?: string) => ({ onClick: () => onAdd(t, p), role: 'button', 'aria-label': `Add ${names[t]} turn ${i + 1}` });
+      const sel = !selected?.recordId && selected?.team === t ? 'sel' : '';
       return [
-        ...scoreCols(t).map((p) => <td key={`${t}s${p}`} className={`fixable ${perPlayer ? 'idle' : ''}`} {...add(p || nextPlayer(t))} />),
-        <td key={`${t}t`} className="tot fixable add" {...add(nextPlayer(t))}>+</td>,
+        ...scoreCols(t).map((p) => <td key={`${t}s${p}`} className={`fixable ${perPlayer ? 'idle' : ''} ${sel}`} {...add(p || nextPlayer(t))} />),
+        <td key={`${t}t`} className={`tot fixable add ${sel}`} {...add(nextPlayer(t))}>+</td>,
       ];
     }
     const miss = r?.score === 0;
     const tap = r && onThrow ? { onClick: () => onThrow(r.id), role: 'button', 'aria-label': `Fix ${names[t]} turn ${r.teamIdx}` } : {};
-    const fix = r && onThrow ? 'fixable' : '';
+    const fix = `${r && onThrow ? 'fixable' : ''} ${r && selected?.recordId === r.id ? 'sel' : ''}`;
     return [
       ...scoreCols(t).map((p) => (r && (!perPlayer || r.player === p)
         ? <td key={`${t}s${p}`} className={`${miss ? 'miss' : ''} ${fix}`} {...tap}>{miss ? '×' : r.score}</td>

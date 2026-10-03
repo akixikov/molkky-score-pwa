@@ -14,7 +14,7 @@
 - `src/store.ts` — IndexedDB（idb-keyval）保存、CSV 書き出し（`rowsForMatch` はシート同期と共通）
 - `src/sync.ts` — チーム共有シートとの同期（設定・未送信キュー・送信・取り込み）。設定と合言葉は本体データ・バックアップと別に保存。`src/useTeamSync.ts` が画面側の状態
 - `apps-script/Code.gs` — チームのシートに貼る Apps Script（ウェブアプリ）。`src/appsScript.test.ts` が同じコードを擬似シートで検証する
-- `src/App.tsx` — 画面の切り替えだけ。`src/screens/`（Home・NewMatch・PracticeSetup・Play・SetEnd・MatchSummary・Review・TeamSync）、`src/components/`（ScoreSheet・TrendChart など）、`src/ui.ts`（遷移の型と共通ヘルパー）、`App.css`
+- `src/App.tsx` — 画面の切り替えだけ。`src/screens/`（Home・NewMatch・PracticeSetup・Play・SetEnd・MatchSummary・MatchEdit・Review・TeamSync）、`src/components/`（ScoreSheet・TrendChart など）、`src/ui.ts`（遷移の型と共通ヘルパー）、`App.css`
 - `vite.config.ts` — base は `package.json` の `name` から自動生成（フォークしてリポジトリ名を変えたら `package.json` の `name` も合わせる）、vite-plugin-pwa
 - `.github/workflows/deploy.yml` — test → build → Pages
 
@@ -39,7 +39,7 @@
 ## 残課題
 - 同期の高速化：複数試合をまとめて送る、`Throws` の書き直しを減らす（`Code.gs` の再デプロイが必要）
 - スマホを替えたとき：端末 ID の引き継ぎ、取り込んだ自分の試合の二重表示の防止
-- 記録の修正：投擲の削除・途中への挿入（結果画面のスコア表で得点と投擲者の修正、各サイドの次の空欄への追加はできる。他の人の試合も可）、記録中のゲームの途中の 1 投、他の人が記録した試合の続きの記録
+- 記録の修正：投擲の削除・途中への挿入（修正モード＝`MatchEdit`・`src/editDraft.ts` で得点と投擲者の修正、各サイドの次の空欄への追加はできる。他の人の試合も可）、記録中のゲームの途中の 1 投、他の人が記録した試合の続きの記録
 - `pull` の差分取り込み（`since`）
 
 ## 開発環境の注意

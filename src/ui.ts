@@ -7,7 +7,7 @@ export type Screen =
   | { name: 'new' }
   | { name: 'practice' }
   | { name: 'play'; matchId: string }
-  | { name: 'match'; matchId: string }
+  | { name: 'match'; matchId: string; edit?: boolean }
   | { name: 'review' }
   | { name: 'sync' };
 

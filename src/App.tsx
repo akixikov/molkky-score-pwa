@@ -9,6 +9,7 @@ import { NewMatch } from './screens/NewMatch';
 import { PracticeSetup } from './screens/PracticeSetup';
 import { Play } from './screens/Play';
 import { MatchSummary } from './screens/MatchSummary';
+import { MatchEdit } from './screens/MatchEdit';
 import { Review } from './screens/Review';
 
 export default function App() {
@@ -65,10 +66,17 @@ export default function App() {
     case 'match': {
       const m = all.find((x) => x.id === screen.matchId);
       if (!m) return <Home data={data} all={all} update={update} go={setScreen} sync={sync} />;
+      if (!screen.edit) return <MatchSummary match={m} go={setScreen} />;
       // A teammate's match is corrected through the team sheet (when its script allows it); an own one here.
-      const edit = !m.remoteBy ? (fn: (x: Match) => Match) => update((d) => patchMatch(d, m.id, fn))
-        : sync.canEditOthers ? (fn: (x: Match) => Match) => sync.editOther(m.id, fn) : undefined;
-      return <MatchSummary match={m} edit={edit} go={setScreen} />;
+      const save = !m.remoteBy ? (x: Match) => update((d) => patchMatch(d, m.id, () => x))
+        : sync.canEditOthers ? (x: Match) => sync.editOther(m.id, () => ({ ...x, remoteBy: undefined })) : undefined;
+      // Own matches go through the normal change queue; a teammate's is deleted on the sheet.
+      const remove = () => {
+        if (m.remoteBy) sync.deleteOther(m.id);
+        else update((d) => ({ ...d, matches: d.matches.filter((x) => x.id !== m.id) }));
+        setScreen({ name: 'home' });
+      };
+      return <MatchEdit key={m.id} match={m} save={save} remove={remove} go={setScreen} />;
     }
   }
 }
