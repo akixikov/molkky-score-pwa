@@ -3,7 +3,7 @@ import { type ReactNode } from 'react';
 import { deriveSet, type DerivedThrow, type SideId } from '../rules';
 import { setWinner, type SetEntry } from '../store';
 import { type Names, dqNames, sideClass } from '../ui';
-import { canAdd } from '../editDraft';
+import { canOffer } from '../editDraft';
 
 function endLabel(s: SetEntry, names: Names): string {
   const st = deriveSet(s.config, s.records);
@@ -38,7 +38,7 @@ export function ScoreSheet({ set, names, action, onThrow, onAdd, selected }: {
   const recorded = (t: SideId) => set.records.filter((x) => x.team === t).length;
   // In edit mode a side's next cell takes a new throw, while the game is not over before it;
   // an extra row below the last one lets any side get one more turn.
-  const addable = new Set(onAdd ? order.filter((t) => canAdd(set, t)) : []);
+  const addable = new Set(onAdd ? order.filter((t) => canOffer(set, t)) : []);
   const rows = turns + (order.some((t) => addable.has(t) && recorded(t) >= turns) ? 1 : 0);
   // The next throw of a side, by lineup, for the blank cell's total column.
   const nextPlayer = (t: SideId) => {

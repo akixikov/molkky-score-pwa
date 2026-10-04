@@ -3,13 +3,15 @@ import { deriveSet, WIN_SCORE } from '../rules';
 import { PinPad } from './ThrowInput';
 import { type Match } from '../store';
 import { type Names } from '../ui';
-import { type Cursor } from '../editDraft';
+import { canAdd, type Cursor } from '../editDraft';
 
-export function EditPad({ match, cursor, names, late, onScore, onPlayer, onClose }: {
+export function EditPad({ match, cursor, names, late, onScore, onPlayer, onFirst, onClose }: {
   match: Match; cursor: Cursor; names: Names;
   /** The last tap tried to add a throw after the end of the game. */
   late: boolean;
-  onScore: (n: number) => void; onPlayer: (p: string) => void; onClose: () => void;
+  onScore: (n: number) => void; onPlayer: (p: string) => void;
+  /** Makes the selected side throw first in this game (when that lets its throw count). */
+  onFirst: () => void; onClose: () => void;
 }) {
   const set = match.sets.find((s) => s.id === cursor.setId);
   if (!set) return null;
@@ -38,7 +40,13 @@ export function EditPad({ match, cursor, names, late, onScore, onPlayer, onClose
         </label>
       )}
       <PinPad need={need} on={rec?.score} onTap={onScore} />
-      {late && <div className="warn-text tiny">The game is already over before this throw, so it cannot be added.</div>}
+      {!rec && !canAdd(set, team) ? (
+        // Only offered when making this side first lets the throw count (see canOffer).
+        <div className="warn-text tiny">
+          With {names[set.config.firstTeam]} throwing first, the game is over before this throw.
+          If {names[team]} actually threw first, <button className="link tiny" onClick={onFirst}>make {names[team]} first</button>.
+        </div>
+      ) : late && <div className="warn-text tiny">The game is already over before this throw, so it cannot be added.</div>}
     </div>
   );
 }

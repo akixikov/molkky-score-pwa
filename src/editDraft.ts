@@ -25,12 +25,18 @@ const counts = (s: SetEntry, rec: ThrowRecord) => deriveSet(s.config, withThrow(
 /** The side can take another throw at the end of its column (the game is not over before it). */
 export const canAdd = (s: SetEntry, team: SideId): boolean => counts(s, { id: '?', team, score: 0, ts: 0 });
 
+/**
+ * The side's blank cell takes a throw: it would count, or would if the side had thrown first
+ * (the pad then offers to switch, for games recorded without who threw first).
+ */
+export const canOffer = (s: SetEntry, team: SideId): boolean => canAdd(s, team) || addsIfFirst(s, team);
+
 /** The cell after this one in the same side's column: its next throw, else its blank cell. */
 function below(s: SetEntry, team: SideId, after?: string): Cursor | null {
   const col = s.records.filter((r) => r.team === team);
   const i = after ? col.findIndex((r) => r.id === after) : -1;
   if (after && i >= 0 && i + 1 < col.length) return { setId: s.id, recordId: col[i + 1].id };
-  return canAdd(s, team) ? { setId: s.id, team, player: nextPlayer(s, team) } : null;
+  return canOffer(s, team) ? { setId: s.id, team, player: nextPlayer(s, team) } : null;
 }
 
 /**
@@ -55,6 +61,20 @@ export function applyScore(m: Match, cur: Cursor, score: number): { match: Match
 /** Changes who threw the selected throw. */
 export const applyPlayer = (m: Match, cur: Cursor & { recordId: string }, player: string): Match =>
   patchSet(m, cur.setId, (s) => ({ ...s, records: s.records.map((r) => (r.id === cur.recordId ? { ...r, player } : r)) }));
+
+/**
+ * Changes which side threw first in a game (often unknown in imported records) and puts the throws
+ * back in turn order for it, which decides who reached 50 first.
+ */
+export const applyFirst = (m: Match, setId: string, team: SideId): Match => patchSet(m, setId, (s) => withFirst(s, team));
+
+function withFirst(s: SetEntry, team: SideId): SetEntry {
+  const config = { ...s.config, firstTeam: team };
+  return { ...s, config, records: inTurnOrder(config, s.records) };
+}
+
+/** Making this side throw first would let it take another throw (the game is not over before it then). */
+export const addsIfFirst = (s: SetEntry, team: SideId): boolean => s.config.firstTeam !== team && canAdd(withFirst(s, team), team);
 
 /** Sets or clears ('') a game's winner decided outside the throws. */
 export const applyWinner = (m: Match, setId: string, w: string): Match =>

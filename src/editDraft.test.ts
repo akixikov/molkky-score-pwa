@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { deriveSet, type ThrowRecord } from './rules';
 import { type Match } from './store';
-import { applyPlayer, applyScore, applyWinner, canAdd, finalize, removeGame, type Cursor } from './editDraft';
+import { addsIfFirst, applyFirst, canOffer, applyPlayer, applyScore, applyWinner, canAdd, finalize, removeGame, type Cursor } from './editDraft';
 
 let seq = 0;
 const t = (team: string, score: number, player?: string): ThrowRecord => ({ id: `r${++seq}`, team, player, score, ts: seq });
@@ -78,5 +78,24 @@ describe('edit draft', () => {
     const m = match(game('g1', recs));
     expect([canAdd(m.sets[0], 'us'), canAdd(m.sets[0], 'them')]).toEqual([false, false]);
     expect(canAdd(match(game('g1', recs.slice(0, 4))).sets[0], 'us')).toBe(true);
+  });
+
+  it('switching the first side lets the other side throw its last turn', () => {
+    // Recorded as us first: us finish on their 5th throw, so them's 5th would come after the end.
+    const recs = [12, 12, 12, 4, 10].flatMap((x, i) => (i < 4 ? [t('us', x, 'A'), t('them', 1)] : [t('us', x, 'A')]));
+    const m = match(game('g1', recs));
+    expect(canAdd(m.sets[0], 'them')).toBe(false);
+    expect(addsIfFirst(m.sets[0], 'them')).toBe(true);
+    // Its blank cell stays selectable, so the pad can offer the switch.
+    expect(canOffer(m.sets[0], 'them')).toBe(true);
+    const flipped = applyFirst(m, 'g1', 'them');
+    expect(flipped.sets[0].config.firstTeam).toBe('them');
+    expect(flipped.sets[0].records.map((r) => r.team).slice(0, 4)).toEqual(['them', 'us', 'them', 'us']);
+    const r = applyScore(flipped, { setId: 'g1', team: 'them' }, 3);
+    expect(r.late).toBeUndefined();
+    expect(scores(r.match, 'them')).toEqual([1, 1, 1, 1, 3]);
+    expect(deriveSet(r.match.sets[0].config, r.match.sets[0].records).winner).toBe('us');
+    // Nothing is dropped on save: the game is in turn order for the new first side.
+    expect(finalize(m, r.match).dropped).toBe(0);
   });
 });

@@ -5,7 +5,7 @@ import { type Match, type SetEntry } from '../store';
 import { isPracticeGame, teamNames, type Go } from '../ui';
 import { ScoreSheet } from '../components/ScoreSheet';
 import { EditPad } from '../components/EditPad';
-import { applyPlayer, applyScore, applyWinner, finalize, removeGame, type Cursor } from '../editDraft';
+import { applyFirst, applyPlayer, applyScore, applyWinner, finalize, removeGame, type Cursor } from '../editDraft';
 
 /**
  * `save` stores the edited match (own: on this device; a teammate's: through the team sheet). Without it,
@@ -55,6 +55,15 @@ export function MatchEdit({ match, save, remove, go }: {
     back();
   };
 
+  // Which side threw first, often unknown in imported games; it decides who reached 50 first.
+  const firstPicker = (set: SetEntry) => (
+    <label className="inline game-winner muted">
+      Game {set.setNo} first
+      <select value={set.config.firstTeam} onChange={(e) => { change(applyFirst(draft, set.id, e.target.value)); setLate(false); }}>
+        {(set.config.sides?.map((x) => x.id) ?? ['us', 'them']).map((id) => <option key={id} value={id}>{names[id]}</option>)}
+      </select>
+    </label>
+  );
   const winnerPicker = (set: SetEntry) => {
     const st = deriveSet(set.config, set.records);
     return (
@@ -118,6 +127,7 @@ export function MatchEdit({ match, save, remove, go }: {
             selected={cursor?.setId === set.id ? cursor : undefined}
             onThrow={canFix ? (recordId) => select({ setId: set.id, recordId }) : undefined}
             onAdd={canFix ? (team, player) => select({ setId: set.id, team, player }) : undefined} />
+          {canFix && firstPicker(set)}
           {canFix && winnerPicker(set)}
         </div>
       ))}
@@ -133,6 +143,10 @@ export function MatchEdit({ match, save, remove, go }: {
           <div className="pad-room" />
           <EditPad match={draft} cursor={cursor} names={names} late={late} onScore={tapScore}
             onPlayer={(p) => ('recordId' in cursor ? change(applyPlayer(draft, cursor, p)) : setCursor({ ...cursor, player: p }))}
+            onFirst={() => {
+              if ('team' in cursor) change(applyFirst(draft, cursor.setId, cursor.team));
+              setLate(false);
+            }}
             onClose={() => setCursor(null)} />
         </>
       )}

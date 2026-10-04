@@ -39,8 +39,8 @@ export function Play({ match, update, go }: { match: Match; data: AppData; updat
     <div className="screen">
       <div className="topline">
         <button className="back" onClick={() => go({ name: 'home' })}>← Matches</button>
-        <span>{title}</span>
-        <span>{names[set.config.firstTeam]} first</span>
+        <span className="center">{title}<br />{names[set.config.firstTeam]} first</span>
+        <button className="ghost small" onClick={() => go({ name: 'match', matchId: match.id, edit: true })}>Edit</button>
       </div>
       <Scoreboard state={state} current={next} names={names} />
       <ThrowInput

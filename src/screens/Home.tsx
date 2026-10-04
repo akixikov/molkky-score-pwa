@@ -127,7 +127,6 @@ export function Home({ data, all, update, go, sync }: { data: AppData; all: Matc
                               </span>
                               {badge && <span className={`badge ${badge.cls}`}>{badge.text}</span>}
                             </button>
-                            <button className="ghost small" onClick={() => go({ name: 'match', matchId: m.id, edit: true })}>Edit</button>
                           </div>
                         );
                       })}
