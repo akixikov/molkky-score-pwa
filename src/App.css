@@ -247,6 +247,7 @@ select.thrower { min-height: 40px; padding: 0 10px; }
 .trend .xlab.on { fill: var(--sheet-ink); font-weight: 700; }
 .trend .line { fill: none; stroke: var(--c, var(--accent)); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .trend .line.dashed { stroke-dasharray: 6 4; }
+.trend .line.gap { stroke-width: 1.5; stroke-dasharray: 1 5; opacity: .6; }
 .trend .dot { fill: var(--c, var(--accent)); stroke: #fff; stroke-width: 2; }
 .trend .dot.open { fill: #fff; stroke: var(--c, var(--accent)); stroke-width: 2; }
 .trend .hit { fill: transparent; cursor: pointer; }

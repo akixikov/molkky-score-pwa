@@ -155,7 +155,7 @@ function ReviewBody({ matches }: { matches: Match[] }) {
               domain={domain}
               sel={selIdx} onSelect={(i) => setPeriod(tours[i].key)}
             />
-            <div className="muted tiny">One point per tournament or practice day{tours.some((t) => t.practice) && tours.some((t) => !t.practice) ? ' (open circles = practice)' : ''}. Tap a point to show it in Key numbers; choose "All dates" above to go back.</div>
+            <div className="muted tiny">One point per tournament or practice day{tours.some((t) => t.practice) && tours.some((t) => !t.practice) ? ' (open circles = practice)' : ''}; a faint dotted line skips dates a player missed. Tap a point to show it in Key numbers; choose "All dates" above to go back.</div>
             <div className="table-scroll">
               <table>
                 <thead><tr><th>Date</th>{lines.map((l) => <th key={l.name} className="nowrap">{swatch(l)} {l.name}</th>)}</tr></thead>

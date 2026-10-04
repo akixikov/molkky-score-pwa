@@ -54,9 +54,12 @@ export function TrendChart({ title, labels, hollow, series, fmt, tick, domain, s
     return t;
   };
   const validOf = (vs: number[]) => vs.map((value, i) => ({ value, i })).filter((p) => !Number.isNaN(p.value));
-  // Missing values (e.g. a player who skipped a tournament) break the line.
+  // Consecutive dates are joined by the line; a stretch over missed dates (e.g. a player who skipped
+  // a tournament) is joined too, but faintly dotted, so the absence still shows.
   const pathOf = (v: { i: number; value: number }[]) =>
     v.map((p, k) => `${k && v[k - 1].i === p.i - 1 ? 'L' : 'M'}${x(p.i)},${y(p.value)}`).join(' ');
+  const gapsOf = (v: { i: number; value: number }[]) =>
+    v.slice(1).map((p, k) => (p.i - v[k].i > 1 ? `M${x(v[k].i)},${y(v[k].value)} L${x(p.i)},${y(p.value)}` : '')).join(' ');
   // Nothing is highlighted while "All dates" is chosen; tapping a point picks that date.
   const shown = sel;
   const slot = n > 1 ? (PW - PAD * 2) / (n - 1) : PW;
@@ -86,6 +89,7 @@ export function TrendChart({ title, labels, hollow, series, fmt, tick, domain, s
               const v = validOf(sr.values);
               return (
                 <g key={sr.name} style={{ '--c': sr.color } as CSSProperties}>
+                  <path className="line gap" d={gapsOf(v)} />
                   <path className={`line ${sr.dashed ? 'dashed' : ''}`} d={pathOf(v)} />
                   {v.map((p) => <circle key={p.i} className={`dot ${hollow?.[p.i] ? 'open' : ''}`} cx={x(p.i)} cy={y(p.value)} r={p.i === shown ? 5 : 3.5} />)}
                 </g>
