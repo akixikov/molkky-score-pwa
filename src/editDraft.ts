@@ -1,20 +1,11 @@
 // Edit mode for a match: changes collect in a draft and are saved together.
-import { deriveSet, inTurnOrder, playableLength, type SideId, type ThrowRecord } from './rules';
+import { deriveSet, inTurnOrder, nextThrower, playableLength, type SideId, type ThrowRecord } from './rules';
 import { uid, type Match, type SetEntry } from './store';
 
 /** The selected cell: a recorded throw, or the next throw of a side (its blank cell). */
 export type Cursor = { setId: string; recordId: string } | { setId: string; team: SideId; player?: string };
 
 const patchSet = (m: Match, setId: string, fn: (s: SetEntry) => SetEntry): Match => ({ ...m, sets: m.sets.map((s) => (s.id === setId ? fn(s) : s)) });
-
-/** Throws recorded for a side (shown or not). */
-const recorded = (s: SetEntry, team: SideId) => s.records.filter((r) => r.team === team).length;
-
-/** Next thrower of a side by its lineup, when it has one. */
-export function nextPlayer(s: SetEntry, team: SideId): string | undefined {
-  const lineup = deriveSet(s.config, s.records).order.find((x) => x.id === team)?.lineup ?? [];
-  return lineup.length > 0 ? lineup[recorded(s, team) % lineup.length] : undefined;
-}
 
 /** Records with a throw added at the end of its side's column. */
 const withThrow = (s: SetEntry, rec: ThrowRecord) => inTurnOrder(s.config, [...s.records, rec]);
@@ -36,7 +27,7 @@ function below(s: SetEntry, team: SideId, after?: string): Cursor | null {
   const col = s.records.filter((r) => r.team === team);
   const i = after ? col.findIndex((r) => r.id === after) : -1;
   if (after && i >= 0 && i + 1 < col.length) return { setId: s.id, recordId: col[i + 1].id };
-  return canOffer(s, team) ? { setId: s.id, team, player: nextPlayer(s, team) } : null;
+  return canOffer(s, team) ? { setId: s.id, team, player: nextThrower(s.config, s.records, team) } : null;
 }
 
 /**

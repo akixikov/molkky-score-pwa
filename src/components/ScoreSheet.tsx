@@ -1,9 +1,8 @@
 // Paper-style score sheet of one game.
 import { type ReactNode } from 'react';
-import { deriveSet, type DerivedThrow, type SideId } from '../rules';
+import { deriveSet, lineupOf, nextThrower, throwCount, type DerivedThrow, type SideId } from '../rules';
 import { setWinner, type SetEntry } from '../store';
 import { type Names, dqNames, sideClass } from '../ui';
-import { canOffer } from '../editDraft';
 
 function endLabel(s: SetEntry, names: Names): string {
   const st = deriveSet(s.config, s.records);
@@ -14,14 +13,16 @@ function endLabel(s: SetEntry, names: Names): string {
 }
 
 /** Paper-style score sheet of one set: one row per turn, sides in throwing order. */
-export function ScoreSheet({ set, names, action, onThrow, onAdd, selected }: {
+export function ScoreSheet({ set, names, action, onThrow, onAdd, addTo, selected }: {
   set: SetEntry; names: Names; action?: ReactNode;
   /** Highlighted cell in edit mode: a recorded throw, or a side's blank cell. */
   selected?: { recordId?: string; team?: string };
   /** When given, tapping a throw's cell opens it for correction. */
   onThrow?: (recordId: string) => void;
-  /** When given, a side's first blank cell adds its next throw (e.g. opponent scores filled in later). */
+  /** When given, the blank cell after the last throw of the sides in `addTo` adds their next throw. */
   onAdd?: (team: SideId, player?: string) => void;
+  /** Sides whose next throw can be added (edit mode decides; see canOffer). */
+  addTo?: SideId[];
 }) {
   const st = deriveSet(set.config, set.records);
   const w = setWinner(set);
@@ -31,20 +32,16 @@ export function ScoreSheet({ set, names, action, onThrow, onAdd, selected }: {
   const turns = Math.max(0, ...cols.map((c) => c.length));
   // Sides with several players get one score column per player; others a single score column.
   const scoreCols = (t: SideId) => {
-    const lineup = st.order.find((x) => x.id === t)?.lineup ?? [];
+    const lineup = lineupOf(set.config, t);
     const players = [...new Set([...lineup, ...byTeam(t).map((r) => r.player ?? '')])];
     return t === 'us' || lineup.length > 1 ? players : [''];
   };
-  const recorded = (t: SideId) => set.records.filter((x) => x.team === t).length;
+  const recorded = (t: SideId) => throwCount(set.records, t);
   // In edit mode a side's next cell takes a new throw, while the game is not over before it;
   // an extra row below the last one lets any side get one more turn.
-  const addable = new Set(onAdd ? order.filter((t) => canOffer(set, t)) : []);
+  const addable = new Set(onAdd ? addTo : []);
   const rows = turns + (order.some((t) => addable.has(t) && recorded(t) >= turns) ? 1 : 0);
-  // The next throw of a side, by lineup, for the blank cell's total column.
-  const nextPlayer = (t: SideId) => {
-    const lineup = st.order.find((x) => x.id === t)?.lineup ?? [];
-    return lineup.length > 0 ? lineup[recorded(t) % lineup.length] : undefined;
-  };
+  const nextPlayer = (t: SideId) => nextThrower(set.config, set.records, t);
   const cells = (t: SideId, r: DerivedThrow | undefined, i: number) => {
     const perPlayer = scoreCols(t)[0] !== '';
     if (!r && onAdd && addable.has(t) && i === recorded(t)) {

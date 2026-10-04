@@ -1,6 +1,6 @@
 // Recording a game: scoreboard and score pad for whichever side throws next.
 import { useMemo, useState } from 'react';
-import { deriveSet, type SideId, type ThrowRecord } from '../rules';
+import { deriveSet, lineupOf, type SideId, type ThrowRecord } from '../rules';
 import { setWinner, uid, type AppData, type Match } from '../store';
 import { isPracticeGame, teamNames, type Update, type Go, patchMatch, patchCurrentSet } from '../ui';
 import { Scoreboard, ThrowInput } from '../components/ThrowInput';
@@ -33,7 +33,7 @@ export function Play({ match, update, go }: { match: Match; data: AppData; updat
   }
 
   const next = state.nextTeam as SideId;
-  const nextLineup = state.order.find((x) => x.id === next)?.lineup ?? [];
+  const nextLineup = lineupOf(set.config, next);
   const player = override ?? state.nextPlayer ?? undefined;
 
   return (

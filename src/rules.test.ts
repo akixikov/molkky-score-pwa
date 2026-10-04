@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyThrow, deriveSet, inTurnOrder, playableLength, sidesOf, type SetConfig, type ThrowRecord } from './rules';
+import { applyThrow, deriveSet, inTurnOrder, lineupOf, nextThrower, playableLength, sidesOf, throwCount, type SetConfig, type ThrowRecord } from './rules';
 
 let seq = 0;
 const t = (team: string, score: number, player?: string): ThrowRecord => ({
@@ -169,5 +169,15 @@ describe('inTurnOrder', () => {
     const sides = [{ id: 's1', name: 'A', lineup: [] }, { id: 's2', name: 'B', lineup: [] }, { id: 's3', name: 'C', lineup: [] }];
     const recs = [t('s1', 0), t('s2', 5), t('s3', 5), t('s1', 0), t('s2', 5), t('s3', 5), t('s1', 0), t('s2', 5), t('s3', 5), t('s2', 5)];
     expect(inTurnOrder({ firstTeam: 's1', lineup: [], sides }, recs)).toEqual(recs);
+  });
+});
+
+describe('side helpers', () => {
+  it('give a side\'s lineup, throw count and next thrower', () => {
+    const cfg: SetConfig = { firstTeam: 'us', lineup: ['A', 'B'] };
+    const recs = [t('us', 5, 'A'), t('them', 3), t('us', 6, 'B'), t('them', 4), t('us', 1, 'A')];
+    expect([lineupOf(cfg, 'us'), lineupOf(cfg, 'them')]).toEqual([['A', 'B'], []]);
+    expect([throwCount(recs, 'us'), throwCount(recs, 'them')]).toEqual([3, 2]);
+    expect([nextThrower(cfg, recs, 'us'), nextThrower(cfg, recs, 'them')]).toEqual(['B', undefined]);
   });
 });

@@ -1,11 +1,11 @@
 // Edit mode of a match: tap a cell, tap scores; every change waits in a draft until Save.
 import { useEffect, useState } from 'react';
-import { deriveSet } from '../rules';
+import { deriveSet, sidesOf } from '../rules';
 import { type Match, type SetEntry } from '../store';
 import { isPracticeGame, teamNames, type Go } from '../ui';
 import { ScoreSheet } from '../components/ScoreSheet';
 import { EditPad } from '../components/EditPad';
-import { applyFirst, applyPlayer, applyScore, applyWinner, finalize, removeGame, type Cursor } from '../editDraft';
+import { applyFirst, applyPlayer, applyScore, applyWinner, canOffer, finalize, removeGame, type Cursor } from '../editDraft';
 
 /**
  * `save` stores the edited match (own: on this device; a teammate's: through the team sheet). Without it,
@@ -126,7 +126,8 @@ export function MatchEdit({ match, save, remove, go }: {
           <ScoreSheet set={set} names={names} action={deleteGame(set)}
             selected={cursor?.setId === set.id ? cursor : undefined}
             onThrow={canFix ? (recordId) => select({ setId: set.id, recordId }) : undefined}
-            onAdd={canFix ? (team, player) => select({ setId: set.id, team, player }) : undefined} />
+            onAdd={canFix ? (team, player) => select({ setId: set.id, team, player }) : undefined}
+            addTo={canFix ? sidesOf(set.config).map((x) => x.id).filter((t) => canOffer(set, t)) : undefined} />
           {canFix && firstPicker(set)}
           {canFix && winnerPicker(set)}
         </div>

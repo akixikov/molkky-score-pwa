@@ -109,6 +109,18 @@ export function sidesOf(config: SetConfig): Side[] {
   return [...all.slice(i), ...all.slice(0, i)];
 }
 
+/** A side's throwing order; empty when it has none (tournament opponents). */
+export const lineupOf = (config: SetConfig, team: SideId): string[] => sidesOf(config).find((s) => s.id === team)?.lineup ?? [];
+
+/** Throws recorded for a side, counted or not. */
+export const throwCount = (records: ThrowRecord[], team: SideId): number => records.filter((r) => r.team === team).length;
+
+/** Who throws a side's next throw by its lineup, when it has one. */
+export function nextThrower(config: SetConfig, records: ThrowRecord[], team: SideId): string | undefined {
+  const lineup = lineupOf(config, team);
+  return lineup.length > 0 ? lineup[throwCount(records, team) % lineup.length] : undefined;
+}
+
 const freshTeam = (): TeamState => ({ score: 0, faultStreak: 0, throws: 0, eliminated: false });
 
 /** Derive the full state of a set from its records. */
@@ -164,8 +176,7 @@ export function deriveSet(config: SetConfig, records: ThrowRecord[]): SetState {
       if (!teams[cand.id].eliminated) { nextTeam = cand.id; break; }
     }
   }
-  const lineup = order.find((s) => s.id === nextTeam)?.lineup ?? [];
-  const nextPlayer = nextTeam && lineup.length > 0 ? lineup[teams[nextTeam].throws % lineup.length] : null;
+  const nextPlayer = (nextTeam && nextThrower(config, records, nextTeam)) || null;
 
   return { order, teams, winner, endReason, nextTeam, nextPlayer, rows };
 }

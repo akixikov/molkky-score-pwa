@@ -1,5 +1,5 @@
 // Edit mode's score pad: docked at the bottom, it writes into the selected cell of the score sheet.
-import { deriveSet, WIN_SCORE } from '../rules';
+import { deriveSet, lineupOf, WIN_SCORE } from '../rules';
 import { PinPad } from './ThrowInput';
 import { type Match } from '../store';
 import { type Names } from '../ui';
@@ -23,7 +23,7 @@ export function EditPad({ match, cursor, names, late, onScore, onPlayer, onFirst
   const need = WIN_SCORE - (row ? row.before : st.teams[team]?.score ?? 0);
   const turn = row?.teamIdx ?? set.records.filter((r) => r.team === team).length + 1;
   const player = rec ? rec.player : 'team' in cursor ? cursor.player : undefined;
-  const lineup = st.order.find((x) => x.id === team)?.lineup ?? [];
+  const lineup = lineupOf(set.config, team);
   const players = [...new Set([...lineup, ...(player ? [player] : [])])];
   return (
     <div className="edit-pad col gap8" role="group" aria-label="Score pad">
