@@ -1,5 +1,5 @@
 // Edit mode of a match: tap a cell, tap scores; every change waits in a draft until Save.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { deriveSet } from '../rules';
 import { type Match, type SetEntry } from '../store';
 import { isPracticeGame, teamNames, type Go } from '../ui';
@@ -20,6 +20,10 @@ export function MatchEdit({ match, save, remove, go }: {
   const [late, setLate] = useState(false);
   // Second taps that confirm: discarding changes, saving with throws removed, deleting the match or a game.
   const [armed, setArmed] = useState<string | null>(null);
+  // Keep the selected cell in sight above the docked pad as the cursor moves down a column.
+  useEffect(() => {
+    document.querySelector('.sheet td.sel')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [cursor]);
   const own = !match.remoteBy;
   const canFix = !!save;
   const names = teamNames(draft);
@@ -107,7 +111,7 @@ export function MatchEdit({ match, save, remove, go }: {
           <label className="field">Opponent<input value={draft.opponent} onChange={(e) => change({ ...draft, opponent: e.target.value })} /></label>
         </div>
       )}
-      {canFix && <div className="muted tiny">Tap a score (or + for a missing throw), then tap the new scores one after another.</div>}
+      {canFix && <div className="muted tiny">Tap a score, or the blank cell below a column to add a throw, then tap the new scores one after another.</div>}
       {draft.sets.map((set) => (
         <div key={set.id} className="col gap4">
           <ScoreSheet set={set} names={names} action={deleteGame(set)}

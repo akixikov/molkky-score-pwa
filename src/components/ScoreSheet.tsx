@@ -3,6 +3,7 @@ import { type ReactNode } from 'react';
 import { deriveSet, type DerivedThrow, type SideId } from '../rules';
 import { setWinner, type SetEntry } from '../store';
 import { type Names, dqNames, sideClass } from '../ui';
+import { canAdd } from '../editDraft';
 
 function endLabel(s: SetEntry, names: Names): string {
   const st = deriveSet(s.config, s.records);
@@ -35,6 +36,10 @@ export function ScoreSheet({ set, names, action, onThrow, onAdd, selected }: {
     return t === 'us' || lineup.length > 1 ? players : [''];
   };
   const recorded = (t: SideId) => set.records.filter((x) => x.team === t).length;
+  // In edit mode a side's next cell takes a new throw, while the game is not over before it;
+  // an extra row below the last one lets any side get one more turn.
+  const addable = new Set(onAdd ? order.filter((t) => canAdd(set, t)) : []);
+  const rows = turns + (order.some((t) => addable.has(t) && recorded(t) >= turns) ? 1 : 0);
   // The next throw of a side, by lineup, for the blank cell's total column.
   const nextPlayer = (t: SideId) => {
     const lineup = st.order.find((x) => x.id === t)?.lineup ?? [];
@@ -42,12 +47,12 @@ export function ScoreSheet({ set, names, action, onThrow, onAdd, selected }: {
   };
   const cells = (t: SideId, r: DerivedThrow | undefined, i: number) => {
     const perPlayer = scoreCols(t)[0] !== '';
-    if (!r && onAdd && i === recorded(t)) {
+    if (!r && onAdd && addable.has(t) && i === recorded(t)) {
       const add = (p?: string) => ({ onClick: () => onAdd(t, p), role: 'button', 'aria-label': `Add ${names[t]} turn ${i + 1}` });
       const sel = !selected?.recordId && selected?.team === t ? 'sel' : '';
       return [
         ...scoreCols(t).map((p) => <td key={`${t}s${p}`} className={`fixable ${perPlayer ? 'idle' : ''} ${sel}`} {...add(p || nextPlayer(t))} />),
-        <td key={`${t}t`} className={`tot fixable add ${sel}`} {...add(nextPlayer(t))}>+</td>,
+        <td key={`${t}t`} className={`tot fixable ${sel}`} {...add(nextPlayer(t))} />,
       ];
     }
     const miss = r?.score === 0;
@@ -91,7 +96,7 @@ export function ScoreSheet({ set, names, action, onThrow, onAdd, selected }: {
             </tr>
           </thead>
           <tbody>
-            {Array.from({ length: turns }, (_, i) => (
+            {Array.from({ length: rows }, (_, i) => (
               <tr key={i}>
                 <td className="turn">{i + 1}</td>
                 {order.flatMap((t, k) => cells(t, cols[k][i], i))}

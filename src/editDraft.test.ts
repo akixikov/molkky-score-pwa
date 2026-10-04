@@ -21,8 +21,8 @@ describe('edit draft', () => {
     }
     expect(scores(m, 'them')).toEqual([5, 0, 7]);
     expect(m.sets[0].records.map((r) => r.team)).toEqual(['us', 'them', 'us', 'them', 'us', 'them']);
-    // No more rows to fill.
-    expect(cur).toBeNull();
+    // The game is not over, so the column goes on into a new row.
+    expect(cur).toMatchObject({ setId: 'g1', team: 'them' });
   });
 
   it('fixing a throw moves to the same side\'s next throw', () => {
@@ -37,7 +37,6 @@ describe('edit draft', () => {
     const recs = [12, 12, 12, 4, 10].flatMap((x, i) => (i < 4 ? [t('us', x, 'A'), t('them', 1)] : [t('us', x, 'A')]));
     const m = match(game('g1', recs));
     expect(deriveSet(m.sets[0].config, m.sets[0].records).winner).toBe('us');
-    expect(canAdd(m.sets[0], 'them')).toBe(true);
     const r = applyScore(m, { setId: 'g1', team: 'them' }, 3);
     expect(r.late).toBe(true);
     expect(r.match).toBe(m);
@@ -64,5 +63,20 @@ describe('edit draft', () => {
     expect(dropped).toBe(2);
     expect(saved.sets[0].records).toHaveLength(9);
     expect(finalize(before, before)).toEqual({ match: before, dropped: 0 });
+  });
+
+  it('adds a throw past the last row', () => {
+    const recs = [t('us', 5, 'A'), t('them', 3), t('us', 6, 'B'), t('them', 4)];
+    // A third turn for us: a new row.
+    const r = applyScore(match(game('g1', recs)), { setId: 'g1', team: 'us', player: 'A' }, 2);
+    expect(scores(r.match, 'us')).toEqual([5, 6, 2]);
+    expect(r.next).toMatchObject({ setId: 'g1', team: 'us', player: 'B' });
+  });
+
+  it('offers no new throw once the game is over', () => {
+    const recs = [12, 12, 12, 4, 10].flatMap((x, i) => (i < 4 ? [t('us', x, 'A'), t('them', 1)] : [t('us', x, 'A')]));
+    const m = match(game('g1', recs));
+    expect([canAdd(m.sets[0], 'us'), canAdd(m.sets[0], 'them')]).toEqual([false, false]);
+    expect(canAdd(match(game('g1', recs.slice(0, 4))).sets[0], 'us')).toBe(true);
   });
 });

@@ -2,7 +2,7 @@
 import { deriveSet, inTurnOrder, playableLength, type SideId, type ThrowRecord } from './rules';
 import { uid, type Match, type SetEntry } from './store';
 
-/** The selected cell: a recorded throw, or the next (blank) throw of a side. */
+/** The selected cell: a recorded throw, or the next throw of a side (its blank cell). */
 export type Cursor = { setId: string; recordId: string } | { setId: string; team: SideId; player?: string };
 
 const patchSet = (m: Match, setId: string, fn: (s: SetEntry) => SetEntry): Match => ({ ...m, sets: m.sets.map((s) => (s.id === setId ? fn(s) : s)) });
@@ -16,12 +16,14 @@ export function nextPlayer(s: SetEntry, team: SideId): string | undefined {
   return lineup.length > 0 ? lineup[recorded(s, team) % lineup.length] : undefined;
 }
 
-/** The side's blank cell is on the sheet (a row of the sheet has no throw of this side yet). */
-export function canAdd(s: SetEntry, team: SideId): boolean {
-  const st = deriveSet(s.config, s.records);
-  const turns = Math.max(0, ...st.order.map((x) => st.rows.filter((r) => r.team === x.id).length));
-  return recorded(s, team) < turns;
-}
+/** Records with a throw added at the end of its side's column. */
+const withThrow = (s: SetEntry, rec: ThrowRecord) => inTurnOrder(s.config, [...s.records, rec]);
+
+/** A throw added there would still count: the game is not over before it. */
+const counts = (s: SetEntry, rec: ThrowRecord) => deriveSet(s.config, withThrow(s, rec)).rows.some((r) => r.id === rec.id);
+
+/** The side can take another throw at the end of its column (the game is not over before it). */
+export const canAdd = (s: SetEntry, team: SideId): boolean => counts(s, { id: '?', team, score: 0, ts: 0 });
 
 /** The cell after this one in the same side's column: its next throw, else its blank cell. */
 function below(s: SetEntry, team: SideId, after?: string): Cursor | null {
@@ -45,9 +47,8 @@ export function applyScore(m: Match, cur: Cursor, score: number): { match: Match
     return { match, next: below(match.sets.find((s) => s.id === set.id)!, rec.team, rec.id) };
   }
   const rec: ThrowRecord = { id: uid(), team: cur.team, ...(cur.player ? { player: cur.player } : {}), score, ts: Date.now() };
-  const records = inTurnOrder(set.config, [...set.records, rec]);
-  if (!deriveSet(set.config, records).rows.some((r) => r.id === rec.id)) return { match: m, next: cur, late: true };
-  const match = patchSet(m, set.id, (s) => ({ ...s, records }));
+  if (!counts(set, rec)) return { match: m, next: cur, late: true };
+  const match = patchSet(m, set.id, (s) => ({ ...s, records: withThrow(s, rec) }));
   return { match, next: below(match.sets.find((s) => s.id === set.id)!, cur.team) };
 }
 

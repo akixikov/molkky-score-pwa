@@ -1,10 +1,9 @@
 // Edit mode's score pad: docked at the bottom, it writes into the selected cell of the score sheet.
-import { deriveSet } from '../rules';
+import { deriveSet, WIN_SCORE } from '../rules';
+import { PinPad } from './ThrowInput';
 import { type Match } from '../store';
 import { type Names } from '../ui';
 import { type Cursor } from '../editDraft';
-
-const SCORES = Array.from({ length: 13 }, (_, i) => i);
 
 export function EditPad({ match, cursor, names, late, onScore, onPlayer, onClose }: {
   match: Match; cursor: Cursor; names: Names;
@@ -18,6 +17,8 @@ export function EditPad({ match, cursor, names, late, onScore, onPlayer, onClose
   const rec = 'recordId' in cursor ? set.records.find((r) => r.id === cursor.recordId) : undefined;
   const team = rec?.team ?? ('team' in cursor ? cursor.team : '');
   const row = rec && st.rows.find((r) => r.id === rec.id);
+  // Points still needed before this throw, as on the recording screen.
+  const need = WIN_SCORE - (row ? row.before : st.teams[team]?.score ?? 0);
   const turn = row?.teamIdx ?? set.records.filter((r) => r.team === team).length + 1;
   const player = rec ? rec.player : 'team' in cursor ? cursor.player : undefined;
   const lineup = st.order.find((x) => x.id === team)?.lineup ?? [];
@@ -36,11 +37,7 @@ export function EditPad({ match, cursor, names, late, onScore, onPlayer, onClose
           </select>
         </label>
       )}
-      <div className="score-grid">
-        {SCORES.map((n) => (
-          <button key={n} className={`pick ${rec?.score === n ? 'on' : ''} ${n === 0 ? 'zero' : ''}`} onClick={() => onScore(n)}>{n}</button>
-        ))}
-      </div>
+      <PinPad need={need} on={rec?.score} onTap={onScore} />
       {late && <div className="warn-text tiny">The game is already over before this throw, so it cannot be added.</div>}
     </div>
   );

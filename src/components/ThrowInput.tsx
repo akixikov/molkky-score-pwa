@@ -1,4 +1,5 @@
 // Input screen parts: the scoreboard and the skittle score pad.
+import { type ReactNode } from 'react';
 import { PIN_ROWS, WIN_SCORE, type SetState, type SideId, type ThrowRecord } from '../rules';
 import { type Names, sideClass } from '../ui';
 
@@ -24,7 +25,31 @@ export function Scoreboard({ state, current, names }: { state: SetState; current
   );
 }
 
-/** Score pad laid out like the initial pin setup; one tap records a throw of that score. */
+/**
+ * Score buttons laid out like the initial pin setup, 0 to the left of the front row. Marks the score
+ * that finishes (`need`) and the ones that go over 50; `on` highlights a current score (edit mode).
+ */
+export function PinPad({ need, on, onTap, undo, children }: {
+  need: number; on?: number; onTap: (score: number) => void; undo?: ReactNode; children?: ReactNode;
+}) {
+  const pinClass = (n: number) => `pin ${n === need ? 'win' : n > need ? 'burst' : ''} ${n === on ? 'on' : ''}`;
+  return (
+    <div className="pins">
+      {[...PIN_ROWS].reverse().map((row, i, rows) => (
+        <div key={i} className="pinrow">
+          {i === 0 && undo}
+          {i === rows.length - 1 && <button className={`pin miss ${on === 0 ? 'on' : ''}`} onClick={() => onTap(0)}>0</button>}
+          {row.map((p) => (
+            <button key={p} className={pinClass(p)} onClick={() => onTap(p)}>{p}</button>
+          ))}
+        </div>
+      ))}
+      {children}
+    </div>
+  );
+}
+
+/** Score pad for the next throw; one tap records a throw of that score. */
 export function ThrowInput({ state, team, name, player, lineup, onPlayer, onThrow, canUndo, onUndo }: {
   state: SetState; team: SideId; name: string; player?: string; lineup?: string[];
   onPlayer?: (p: string) => void; onThrow: (r: Omit<ThrowRecord, 'id' | 'ts'>) => void;
@@ -33,7 +58,6 @@ export function ThrowInput({ state, team, name, player, lineup, onPlayer, onThro
   const t = state.teams[team];
   const need = WIN_SCORE - t.score;
   const tap = (score: number) => onThrow(player ? { team, player, score } : { team, score });
-  const pinClass = (n: number) => `pin ${n === need ? 'win' : n > need ? 'burst' : ''}`;
   return (
     <>
       <div className="col gap4">
@@ -47,26 +71,17 @@ export function ThrowInput({ state, team, name, player, lineup, onPlayer, onThro
         </div>
         <div className="h2">{player ?? name}: tap the score</div>
       </div>
-      <div className="pins">
-        {[...PIN_ROWS].reverse().map((row, i, rows) => (
-          <div key={i} className="pinrow">
-            {i === 0 && (
-              <button className="undo" aria-label="Undo last throw" title="Undo last throw" disabled={!canUndo} onClick={onUndo}>
-                <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
-                </svg>
-              </button>
-            )}
-            {i === rows.length - 1 && <button className="pin miss" onClick={() => tap(0)}>0</button>}
-            {row.map((p) => (
-              <button key={p} className={pinClass(p)} onClick={() => tap(p)}>{p}</button>
-            ))}
-          </div>
-        ))}
+      <PinPad need={need} onTap={tap} undo={
+        <button className="undo" aria-label="Undo last throw" title="Undo last throw" disabled={!canUndo} onClick={onUndo}>
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+          </svg>
+        </button>
+      }>
         <div className="muted tiny center">
           {need} to finish{need > 12 ? ' (2+ turns)' : ''} · misses in a row: {t.faultStreak}
         </div>
-      </div>
+      </PinPad>
     </>
   );
 }
