@@ -132,13 +132,20 @@ select { width: auto; }
 .score.out { opacity: .5; }
 .score .inline.base { flex-wrap: wrap; column-gap: 6px; row-gap: 0; }
 .score .inline.base .muted { white-space: nowrap; }
-.big-num { font-family: 'Barlow Condensed', sans-serif; font-size: 48px; font-weight: 700; line-height: 1; }
-.grid3 .score .big-num { font-size: 40px; }
+.big-num { font-family: 'Barlow Condensed', sans-serif; font-size: 42px; font-weight: 700; line-height: 1; }
+/* Three or more sides (practice): compact cards, the score and the miss dots on one line. */
+.grid3 .score { padding: 8px 10px; }
+.grid3 .score .inline.base { flex-wrap: nowrap; align-items: center; justify-content: space-between; }
+.grid3 .score .big-num { font-size: 30px; }
+.grid3 .score .inline.base .muted { display: none; }
 .dots { display: flex; gap: 4px; }
 .dot { width: 10px; height: 10px; border-radius: 5px; border: 1.5px solid var(--warn); }
 .dot.on { background: var(--warn); }
 /* Same height with or without the player select, so the pad doesn't shift between turns. */
 .turnhead { min-height: 44px; }
+/* The thrower stands out: bold and larger, as a select when the side has a lineup. */
+.thrower { font-size: 18px; font-weight: 700; color: var(--ink); }
+select.thrower { min-height: 40px; padding: 0 10px; }
 
 .pins { --pin: 52px; --pgap: 8px; display: flex; flex-direction: column; gap: var(--pgap); align-items: center; }
 .pinrow { display: flex; gap: var(--pgap); position: relative; }
@@ -152,6 +159,14 @@ select { width: auto; }
 /* Left edge aligned with the 0 pin (back row is half a pin wider per side than the front row). */
 .undo { position: absolute; right: calc(100% + var(--pin) / 2 + 1.5 * var(--pgap)); width: var(--pin); height: var(--pin); min-height: 0; border-radius: 50%;
   display: grid; place-items: center; background: #fff; border: 1.5px solid var(--btnline); color: var(--accent); }
+
+/* Short screens (e.g. iPhone SE in Safari): smaller pins and gaps so End game stays on screen. */
+@media (max-height: 600px) {
+  .screen { gap: 10px; }
+  .pins { --pin: 44px; --pgap: 6px; }
+  .grid3 .score { padding: 5px 10px; }
+  .grid3 .score .big-num { font-size: 26px; }
+}
 
 /* ---------- Results: game end, match summary, stat cards ---------- */
 .result { background: var(--accent); color: #fff; border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }

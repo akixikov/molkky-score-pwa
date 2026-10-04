@@ -3,6 +3,8 @@ import { type ReactNode } from 'react';
 import { PIN_ROWS, WIN_SCORE, type SetState, type SideId, type ThrowRecord } from '../rules';
 import { type Names, sideClass } from '../ui';
 
+const dots = (n: number) => <div className="dots">{[0, 1, 2].map((i) => <span key={i} className={i < n ? 'dot on' : 'dot'} />)}</div>;
+
 export function Scoreboard({ state, current, names }: { state: SetState; current: SideId | null; names: Names }) {
   // Tournament games keep us on the left; practice games follow the throwing order.
   const ids = 'us' in state.teams && 'them' in state.teams ? ['us', 'them'] : state.order.map((x) => x.id);
@@ -13,11 +15,13 @@ export function Scoreboard({ state, current, names }: { state: SetState; current
         return (
           <div key={t} className={`card score ${sideClass(t)} ${current === t ? 'active' : ''} ${s.eliminated ? 'out' : ''}`}>
             <div className="label">{names[t]}</div>
+            {/* Compact cards (3+ sides) put the dots beside the score. */}
             <div className="inline base">
               <span className="big-num">{s.eliminated ? 'DQ' : s.score}</span>
               {!s.eliminated && <span className="muted">{WIN_SCORE - s.score} to go</span>}
+              {ids.length > 2 && dots(s.faultStreak)}
             </div>
-            <div className="dots">{[0, 1, 2].map((i) => <span key={i} className={i < s.faultStreak ? 'dot on' : 'dot'} />)}</div>
+            {ids.length <= 2 && dots(s.faultStreak)}
           </div>
         );
       })}
@@ -60,16 +64,16 @@ export function ThrowInput({ state, team, name, player, lineup, onPlayer, onThro
   const tap = (score: number) => onThrow(player ? { team, player, score } : { team, score });
   return (
     <>
-      <div className="col gap4">
-        <div className="inline between turnhead">
-          <div className="sub">{name} · turn {t.throws + 1}</div>
-          {lineup && onPlayer && (
-            <select value={player} onChange={(e) => onPlayer(e.target.value)}>
+      {/* Whose turn, in one line: the side and turn, then the thrower (changeable when the side has a lineup). */}
+      <div className="inline between turnhead">
+        <div className="sub">{name} · turn {t.throws + 1}</div>
+        {lineup && onPlayer
+          ? (
+            <select className="thrower" aria-label="Thrower" value={player} onChange={(e) => onPlayer(e.target.value)}>
               {lineup.map((p) => <option key={p}>{p}</option>)}
             </select>
-          )}
-        </div>
-        <div className="h2">{player ?? name}: tap the score</div>
+          )
+          : player && player !== name && <span className="thrower">{player}</span>}
       </div>
       <PinPad need={need} onTap={tap} undo={
         <button className="undo" aria-label="Undo last throw" title="Undo last throw" disabled={!canUndo} onClick={onUndo}>
@@ -77,11 +81,7 @@ export function ThrowInput({ state, team, name, player, lineup, onPlayer, onThro
             <path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
           </svg>
         </button>
-      }>
-        <div className="muted tiny center">
-          {need} to finish{need > 12 ? ' (2+ turns)' : ''} · misses in a row: {t.faultStreak}
-        </div>
-      </PinPad>
+      } />
     </>
   );
 }
