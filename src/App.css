@@ -72,6 +72,18 @@ select { width: auto; }
 .chip.on-series { border: 2px solid var(--c); background: #fff; font-weight: 700; box-shadow: inset 0 -3px 0 var(--c); }
 
 /* ---------- Home ---------- */
+/* Header: a type-only wordmark and the sync chip; the only filled green on top is the New match tile. */
+.brand { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+.wordmark { font-size: 22px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+.wordmark span { font-family: 'Barlow Condensed', sans-serif; font-size: 30px; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--accent); }
+.sync-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border-radius: 16px;
+  border: 1px solid var(--line); background: var(--card); font-size: 13px; color: var(--muted); white-space: nowrap; }
+.sync-dot { width: 8px; height: 8px; border-radius: 4px; background: var(--btnline); }
+.sync-chip.ok .sync-dot { background: var(--accent); }
+.sync-chip.busy .sync-dot { background: var(--opp); }
+.sync-chip.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-bg); }
+.sync-chip.warn .sync-dot { background: var(--warn); }
 /* Home actions: three tiles of one shape; the main one is filled. */
 .actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .action { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 84px; padding: 10px 4px;
@@ -102,8 +114,6 @@ select { width: auto; }
 .group-date { font-family: 'Barlow Condensed', sans-serif; font-size: 15px; color: var(--muted); font-weight: 600; }
 .chev { font-size: 22px; line-height: 1; color: var(--muted); transition: transform .15s; width: 14px; }
 .chev.open { transform: rotate(90deg); }
-.sync-row { display: flex; justify-content: space-between; align-items: center; padding: 0 14px; gap: 12px; }
-.sync-row .muted { text-align: right; }
 
 /* ---------- Match and practice setup ---------- */
 .lineup { display: flex; align-items: center; gap: 8px; }

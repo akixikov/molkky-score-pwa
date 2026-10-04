@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { download, setWinner, toCsv, tournamentKey, type AppData, type Match } from '../store';
 import { isConfigured } from '../sync';
 import { today, isPracticeGame, sidesLabel, teamNames, type Update, type Go } from '../ui';
-import { type Sync, syncSummary } from '../useTeamSync';
+import { type Sync, syncChip, syncSummary } from '../useTeamSync';
 
 const EXPANDED_KEY = 'molkky-expanded-groups';
 /** Groups shown per section before "Show older". */
@@ -51,8 +51,13 @@ export function Home({ data, all, update, go, sync }: { data: AppData; all: Matc
   };
   return (
     <div className="screen">
-      <header className="head">
-        <h1>Mölkky Scorer</h1>
+      <header className="brand">
+        <h1 className="wordmark"><span>Mölkky</span> Scorer</h1>
+        {/* Sync state at a glance; opens Team sync. */}
+        <button className={`sync-chip ${syncChip(sync).tone}`} title={syncSummary(sync)} aria-label={`Team sync: ${syncSummary(sync)}`}
+          onClick={() => go({ name: 'sync' })}>
+          <span className="sync-dot" aria-hidden />{syncChip(sync).label}
+        </button>
       </header>
       {/* The three ways in, as one row of matching tiles. */}
       <nav className="actions">
@@ -144,9 +149,6 @@ export function Home({ data, all, update, go, sync }: { data: AppData; all: Matc
         );
       })}
       <div className="spacer" />
-      <button className="ghost sync-row" onClick={() => go({ name: 'sync' })}>
-        <span>Team sync</span><span className="muted">{syncSummary(sync)}</span>
-      </button>
       <div className="grid3">
         <button className="ghost small" onClick={() => download(`molkky-${today()}.csv`, toCsv(data), 'text/csv')}>Export CSV</button>
         <button className="ghost small" onClick={() => download(`molkky-backup-${today()}.json`, JSON.stringify(data), 'application/json')}>Save backup</button>

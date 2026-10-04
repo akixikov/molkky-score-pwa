@@ -205,3 +205,13 @@ export function syncSummary(sync: Sync): string {
   if (pending > 0) return `${pending} unsent`;
   return sync.status.lastSync ? `Synced ${clock(sync.status.lastSync)}` : 'On';
 }
+
+/** Short sync state for the chip at the top of the home screen; the full text is in syncSummary. */
+export function syncChip(sync: Sync): { label: string; tone: 'off' | 'ok' | 'busy' | 'warn' } {
+  if (!isConfigured(sync.settings)) return { label: 'Sync off', tone: 'off' };
+  const pending = pendingCount(sync.queue);
+  if (sync.busy) return { label: 'Syncing…', tone: 'busy' };
+  if (sync.status.lastError && (pending > 0 || showsWhenIdle(sync.status.lastError))) return { label: 'Sync issue', tone: 'warn' };
+  if (pending > 0) return { label: `${pending} unsent`, tone: 'warn' };
+  return { label: sync.status.lastSync ? `Synced ${clock(sync.status.lastSync)}` : 'Sync on', tone: 'ok' };
+}
