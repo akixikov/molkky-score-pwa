@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { rowsForMatch, toCsv, type Match } from './store';
-import { afterFlush, call, canFixOthers, flush, fromPull, ownDeleted, ownFixedElsewhere, ownLive, pull, queueAll, queueChanges, queueDeleteOther, queuePutOther, URL_RE, type SyncSettings } from './sync';
+import { afterFlush, call, canFixOthers, mergeRemote, ownBack, ownGone, flush, fromPull, ownDeleted, ownFixedElsewhere, ownLive, pull, queueAll, queueChanges, queueDeleteOther, queuePutOther, URL_RE, type SyncSettings } from './sync';
 
 const match = (id: string, updatedAt = 1): Match => ({
   id, date: '2026-09-21', tournament: 'Nara Open', opponent: 'Kanto', kind: 'tournament', updatedAt,
@@ -233,5 +233,36 @@ describe("correcting teammates' matches", () => {
     expect(ownFixedElsewhere(live, mine, []).map((m) => m.id)).toEqual(['b', 'c']);
     expect(ownFixedElsewhere(live, mine, ['c']).map((m) => m.id)).toEqual(['b']);
     // 'e' changed here while sync was off (so never queued): the older sheet version must not win.
+  });
+});
+
+describe('applying a pull', () => {
+  const remote = (id: string, updatedAt = 1) => ({ match: match(id, updatedAt), deviceId: 'dev2', recorder: 'Ken' });
+
+  it("keeps teammates' matches deleted or corrected here until that is sent", () => {
+    const pulled = [remote('a'), remote('b'), remote('c')];
+    const current = [remote('a'), remote('b', 7)];
+    const merged = mergeRemote(pulled, current, { put: [], del: [], delOthers: ['a'], putOthers: ['b'] });
+    expect(merged.map((g) => [g.match.id, g.match.updatedAt])).toEqual([['b', 7], ['c', 1]]);
+    // Nothing pending: the pull replaces everything.
+    expect(mergeRemote(pulled, current, { put: [], del: [] })).toEqual(pulled);
+  });
+
+  it('removes own matches deleted on the sheet and drops their pending deletion', () => {
+    const mine = [match('a'), match('b')];
+    const { remove, queue } = ownGone(['a', 'x'], mine, { put: [], del: ['a', 'b'] });
+    expect(remove).toEqual(['a']);
+    expect(queue.del).toEqual(['b']);
+    const none = { put: [], del: ['b'] };
+    expect(ownGone(['x'], mine, none)).toEqual({ remove: [], queue: none });
+  });
+
+  it('brings back own matches undeleted on the sheet and takes over corrections', () => {
+    const mine = [match('a', 1), match('b', 1)];
+    const live = [match('a', 1), match('b', 5), match('c', 1), match('d', 1)];
+    const r = ownBack(live, mine, { put: [], del: ['d'] });
+    // 'd' is about to be deleted here, so it does not come back.
+    expect(r.restore.map((m) => m.id)).toEqual(['c']);
+    expect(r.replace.map((m) => m.id)).toEqual(['b']);
   });
 });

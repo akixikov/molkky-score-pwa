@@ -287,6 +287,36 @@ export function ownFixedElsewhere(live: Match[], mine: Match[], pendingPut: stri
   });
 }
 
+/**
+ * Teammates' matches after a pull. The pull is the full list, but a match deleted here and not yet
+ * deleted on the sheet stays hidden, and one corrected here and not yet sent keeps the correction.
+ */
+export function mergeRemote(pulled: RemoteGame[], current: RemoteGame[], q: SyncQueue): RemoteGame[] {
+  const deleting = new Set(q.delOthers ?? []);
+  const fixing = new Map(current.filter((g) => q.putOthers?.includes(g.match.id)).map((g) => [g.match.id, g]));
+  return pulled.filter((g) => !deleting.has(g.match.id)).map((g) => fixing.get(g.match.id) ?? g);
+}
+
+/**
+ * Own matches deleted on the sheet (by a teammate) leave this device too; their own pending deletion
+ * is dropped from the queue, as the sheet already has it.
+ */
+export function ownGone(ids: string[], mine: Match[], q: SyncQueue): { remove: string[]; queue: SyncQueue } {
+  const here = new Set(mine.map((m) => m.id));
+  const remove = ids.filter((id) => here.has(id));
+  return { remove, queue: remove.length === 0 ? q : { ...q, del: q.del.filter((id) => !remove.includes(id)) } };
+}
+
+/**
+ * Own matches to take from the sheet: ones live there but missing here (undeleted on the sheet),
+ * unless this device is about to delete them itself, and ones a teammate corrected.
+ */
+export function ownBack(live: Match[], mine: Match[], q: SyncQueue): { restore: Match[]; replace: Match[] } {
+  const here = new Set(mine.map((m) => m.id));
+  const deleting = new Set(q.del);
+  return { restore: live.filter((m) => !here.has(m.id) && !deleting.has(m.id)), replace: ownFixedElsewhere(live, mine, q.put) };
+}
+
 export interface PullResult {
   /** Version of the sheet script; 0 when it is too old to report one. */
   version?: number;

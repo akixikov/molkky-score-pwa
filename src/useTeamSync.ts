@@ -1,7 +1,7 @@
 // Team sync state for the UI: the unsent queue, sending, and pulling teammates' matches.
 import { useEffect, useRef, useState } from 'react';
 import { type AppData, type Match } from './store';
-import { afterFlush, canFixOthers, emptyQueue, errorText, flush, isConfigured, loadQueue, loadRemote, loadSettings, loadStatus, ownFixedElsewhere, pendingCount, pull, queueAll, queueChanges, queueDeleteOther, queuePutOther, saveQueue, saveRemote, saveSettings, saveStatus, type RemoteGame, type SyncQueue, type SyncSettings, type SyncStatus } from './sync';
+import { afterFlush, canFixOthers, emptyQueue, errorText, flush, isConfigured, loadQueue, loadRemote, loadSettings, loadStatus, mergeRemote, ownBack, ownGone, pendingCount, pull, queueAll, queueChanges, queueDeleteOther, queuePutOther, saveQueue, saveRemote, saveSettings, saveStatus, type RemoteGame, type SyncQueue, type SyncSettings, type SyncStatus } from './sync';
 
 export interface Sync {
   settings: SyncSettings | null;
@@ -74,25 +74,16 @@ export function useTeamSync(getMatches: () => Match[], applyOwn: OwnChanges): Sy
     let error: string | undefined;
     let notice: string | undefined;
     let sheetVersion: number | undefined;
-    // Own matches a teammate deleted on the sheet leave this device too.
+    // The sheet's changes to own matches (see ownGone / ownBack).
     const dropOwn = (ids: string[]) => {
-      const mine = new Set(getMatches().map((m) => m.id));
-      const gone = ids.filter((id) => mine.has(id));
-      if (gone.length === 0) return;
-      applyOwn({ remove: gone, restore: [], replace: [] });
-      // Already deleted on the sheet: do not send the deletion back.
-      const q = ref.current.queue;
-      writeQueue({ ...q, del: q.del.filter((id) => !gone.includes(id)) });
+      const { remove, queue } = ownGone(ids, getMatches(), ref.current.queue);
+      if (remove.length === 0) return;
+      applyOwn({ remove, restore: [], replace: [] });
+      writeQueue(queue);
     };
-    // Own matches live on the sheet but missing here (undeleted on the sheet) come back,
-    // unless this device is still about to delete them itself. Ones a teammate corrected are taken over.
     const restoreOwn = (live: Match[]) => {
-      const mine = getMatches();
-      const ids = new Set(mine.map((m) => m.id));
-      const deleting = new Set(ref.current.queue.del);
-      const back = live.filter((m) => !ids.has(m.id) && !deleting.has(m.id));
-      const fixed = ownFixedElsewhere(live, mine, ref.current.queue.put);
-      if (back.length > 0 || fixed.length > 0) applyOwn({ remove: [], restore: back, replace: fixed });
+      const { restore, replace } = ownBack(live, getMatches(), ref.current.queue);
+      if (restore.length > 0 || replace.length > 0) applyOwn({ remove: [], restore, replace });
     };
     if (needPush) {
       // Take each finished match off the queue at once, so a long send cut short still counts.
@@ -108,11 +99,7 @@ export function useTeamSync(getMatches: () => Match[], applyOwn: OwnChanges): Sy
       if (p.games) {
         ref.current.lastPull = Date.now();
         sheetVersion = p.version;
-        // A teammate's match deleted here but not yet on the sheet stays hidden; one corrected here
-        // but not yet sent keeps the correction.
-        const pending = new Set(ref.current.queue.delOthers ?? []);
-        const fixing = new Map(ref.current.remote.filter((g) => ref.current.queue.putOthers?.includes(g.match.id)).map((g) => [g.match.id, g]));
-        writeRemote(p.games.filter((g) => !pending.has(g.match.id)).map((g) => fixing.get(g.match.id) ?? g));
+        writeRemote(mergeRemote(p.games, ref.current.remote, ref.current.queue));
         dropOwn(p.ownDeleted ?? []);
         restoreOwn(p.ownLive ?? []);
       } else error = p.error;
