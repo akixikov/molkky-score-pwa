@@ -24,7 +24,7 @@ export function MatchSummary({ match, go }: { match: Match; go: Go }) {
           <div className="result-title">{w ? `Winner: ${names[w]}` : 'No result'}</div>
         </div>
       ) : (
-        <div className={`result ${verdict === 'Loss' ? 'lose' : ''}`}>
+        <div className={`result ${verdict === 'Loss' ? 'lose' : verdict === 'Draw' ? 'draw' : ''}`}>
           <div>{match.ourTeam ? `${match.ourTeam} ` : ''}vs {match.opponent || 'Opponent'}</div>
           <div className="result-title">{verdict} {won}-{lost}</div>
         </div>

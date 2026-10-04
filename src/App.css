@@ -107,7 +107,8 @@ select { width: auto; }
   font-family: 'Barlow Condensed', sans-serif; font-size: 16px; font-weight: 700; color: var(--muted); }
 .badge { flex: none; min-width: 56px; text-align: center; font-variant-numeric: tabular-nums; padding: 2px 8px; border-radius: 10px; font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 700; background: var(--soft); color: var(--muted); }
 .badge.win { background: var(--accent); color: #fff; }
-.badge.loss { background: var(--opp-bg); color: var(--opp); }
+.badge.draw { background: var(--draw-bg); color: var(--accent-dark); }
+.badge.loss { background: var(--loss-bg); color: var(--muted); }
 .badge.live { background: var(--warn-bg); color: var(--warn); }
 .more { align-self: center; padding: 8px 0; }
 .section-title { margin: 8px 0 0; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
@@ -178,7 +179,8 @@ select.thrower { min-height: 40px; padding: 0 10px; }
 
 /* ---------- Results: game end, match summary, stat cards ---------- */
 .result { background: var(--accent); color: #fff; border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
-.result.lose { background: var(--opp); }
+.result.draw { background: var(--draw-bg); color: var(--accent-dark); }
+.result.lose { background: var(--loss); }
 .result-title { font-size: 28px; font-weight: 700; }
 .finals { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 16px; }
 .huge { font-family: 'Barlow Condensed', sans-serif; font-size: 56px; font-weight: 700; line-height: 1; }

@@ -112,7 +112,7 @@ export function Home({ data, all, update, go, sync }: { data: AppData; all: Matc
                           : practice ? null
                           : verdict === 'Win' ? { cls: 'win', text: `W ${won}-${lost}` }
                           : verdict === 'Loss' ? { cls: 'loss', text: `L ${won}-${lost}` }
-                          : { cls: '', text: `D ${won}-${lost}` };
+                          : { cls: 'draw', text: `D ${won}-${lost}` };
                         return (
                           <div key={m.id} className="game-row">
                             <button className="rowmain" onClick={() => go({ name: decided || m.remoteBy ? 'match' : 'play', matchId: m.id })}>
