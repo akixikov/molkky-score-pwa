@@ -72,6 +72,13 @@ export function setWinner(s: SetEntry): SideId | null {
   return s.manualWinner ?? deriveSet(s.config, s.records).winner;
 }
 
+/** Games won and lost by us in a match, and the verdict they give. */
+export function matchResult(m: Pick<Match, 'sets'>): { won: number; lost: number; verdict: 'Win' | 'Loss' | 'Draw' } {
+  const won = m.sets.filter((s) => setWinner(s) === 'us').length;
+  const lost = m.sets.filter((s) => setWinner(s) === 'them').length;
+  return { won, lost, verdict: won > lost ? 'Win' : won < lost ? 'Loss' : 'Draw' };
+}
+
 const esc = (v: unknown) => {
   const x = String(v ?? '');
   return /[",\n]/.test(x) ? `"${x.replace(/"/g, '""')}"` : x;

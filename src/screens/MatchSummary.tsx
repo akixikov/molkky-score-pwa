@@ -1,5 +1,5 @@
 // Match result: stats and score sheets. Corrections happen in the edit mode (MatchEdit).
-import { setWinner, type Match } from '../store';
+import { matchResult, setWinner, type Match } from '../store';
 import { isPracticeGame, sidesLabel, teamNames, type Go } from '../ui';
 import { TeamStatsCard } from '../components/StatsCards';
 import { ScoreSheet } from '../components/ScoreSheet';
@@ -7,9 +7,7 @@ import { TopBar } from '../components/TopBar';
 
 /** Match result, read-only; Edit opens the edit mode (also for teammates' matches). */
 export function MatchSummary({ match, go }: { match: Match; go: Go }) {
-  const won = match.sets.filter((s) => setWinner(s) === 'us').length;
-  const lost = match.sets.filter((s) => setWinner(s) === 'them').length;
-  const verdict = won > lost ? 'Win' : won < lost ? 'Loss' : 'Draw';
+  const { won, lost, verdict } = matchResult(match);
   const readOnly = match.remoteBy && <div className="muted">Recorded by {match.remoteBy}.</div>;
   const editButton = <button className="ghost small" onClick={() => go({ name: 'match', matchId: match.id, edit: true })}>Edit</button>;
   const legend = <div className="muted tiny">× miss (incl. foul)　<span className="legend over">25</span> over 50, back to 25　<span className="legend fin">50</span> finish</div>;
@@ -38,7 +36,7 @@ export function MatchSummary({ match, go }: { match: Match; go: Go }) {
     <div className="screen">
       <TopBar back="Matches" onBack={() => go({ name: 'home' })} title={match.tournament || '(no tournament)'}
         sub={`${match.date}${match.kind === 'practice' ? ' · Practice' : ''}`} action={editButton} />
-      <div className={`result ${won < lost ? 'lose' : ''}`}>
+      <div className={`result ${verdict === 'Loss' ? 'lose' : ''}`}>
         <div>{match.ourTeam ? `${match.ourTeam} ` : ''}vs {match.opponent || 'Opponent'}</div>
         <div className="result-title">{verdict} {won}-{lost}</div>
       </div>

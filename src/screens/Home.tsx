@@ -1,7 +1,7 @@
 // Home: tournaments and practice days, grouped and collapsible.
 import { useState } from 'react';
 
-import { download, setWinner, toCsv, tournamentKey, type AppData, type Match } from '../store';
+import { download, matchResult, setWinner, toCsv, tournamentKey, type AppData, type Match } from '../store';
 import { isConfigured } from '../sync';
 import { today, isPracticeGame, sidesLabel, teamNames, type Update, type Go } from '../ui';
 import { type Sync, syncChip, syncSummary } from '../useTeamSync';
@@ -44,10 +44,8 @@ export function Home({ data, all, update, go, sync }: { data: AppData; all: Matc
     try { sessionStorage.setItem(EXPANDED_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
   };
   const result = (m: Match) => {
-    const won = m.sets.filter((s) => setWinner(s) === 'us').length;
-    const lost = m.sets.filter((s) => setWinner(s) === 'them').length;
     const last = m.sets[m.sets.length - 1];
-    return { won, lost, winner: setWinner(last), decided: !!setWinner(last) || last.closed };
+    return { ...matchResult(m), winner: setWinner(last), decided: !!setWinner(last) || last.closed };
   };
   return (
     <div className="screen">
@@ -84,8 +82,8 @@ export function Home({ data, all, update, go, sync }: { data: AppData; all: Matc
             {list.slice(0, list.length - older).map(([key, ms]) => {
               const first = ms[0];
               const rs = ms.map(result).filter((r) => r.decided);
-              const w = rs.filter((r) => r.won > r.lost).length;
-              const l = rs.filter((r) => r.won < r.lost).length;
+              const w = rs.filter((r) => r.verdict === 'Win').length;
+              const l = rs.filter((r) => r.verdict === 'Loss').length;
               const dr = rs.length - w - l;
               const isOpen = expanded.has(key);
               return (
@@ -107,13 +105,13 @@ export function Home({ data, all, update, go, sync }: { data: AppData; all: Matc
                   {isOpen && (
                     <div className="card games">
                       {ms.map((m, i) => {
-                        const { won, lost, winner, decided } = result(m);
+                        const { won, lost, verdict, winner, decided } = result(m);
                         const practice = isPracticeGame(m);
                         const names = teamNames(m);
                         const badge = !decided ? { cls: 'live', text: 'Live' }
                           : practice ? null
-                          : won > lost ? { cls: 'win', text: `W ${won}-${lost}` }
-                          : won < lost ? { cls: 'loss', text: `L ${won}-${lost}` }
+                          : verdict === 'Win' ? { cls: 'win', text: `W ${won}-${lost}` }
+                          : verdict === 'Loss' ? { cls: 'loss', text: `L ${won}-${lost}` }
                           : { cls: '', text: `D ${won}-${lost}` };
                         return (
                           <div key={m.id} className="game-row">
