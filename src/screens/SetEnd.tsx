@@ -58,55 +58,45 @@ export function SetEnd({ match, set, state, winner, update, go, undo, title }: {
     go({ name: 'play', matchId: again.id });
   };
 
-  if (practice) {
-    return (
-      <div className="screen">
-        <TopBar back="Matches" onBack={() => go({ name: 'home' })} title={title} />
-        <div className="result">
-          <div>Game over (auto)</div>
-          <div className="result-title">{winner ? `Winner: ${names[winner]}` : 'No result'}</div>
-          <div>Decided by: {reason}</div>
+  // Practice: final scores of every side, and play again; tournament: the next game's settings.
+  return (
+    <div className="screen">
+      <TopBar back="Matches" onBack={() => go({ name: 'home' })} title={title} />
+      <div className={practice ? 'result' : `result ${winner === 'them' ? 'lose' : ''}`}>
+        <div>Game over (auto)</div>
+        <div className="result-title">{winner ? `Winner: ${names[winner]}` : 'No result'}</div>
+        <div>Decided by: {reason}</div>
+        {practice ? (
           <div className="finals">
             {state.order.map((x) => (
               <span key={x.id}><span className="dim">{x.name}</span> <span className="strong">{state.teams[x.id].eliminated ? 'DQ' : state.teams[x.id].score}</span></span>
             ))}
           </div>
-        </div>
-        {state.order.map((x) => <TeamStatsCard key={x.id} title={`${names[x.id]} this game`} sets={[set]} team={x.id} />)}
-        <div className="spacer" />
-        <div className="grid3">
-          <button className="ghost" onClick={undo}>Fix last throw</button>
-          <button className="ghost" onClick={finishMatch}>Done</button>
-          <button className="primary" onClick={playAgain}>Play again</button>
-        </div>
+        ) : (
+          <div className="inline base gap12">
+            <span className="huge">{state.teams.us.score}</span><span>–</span><span className="huge dim">{state.teams.them.score}</span>
+          </div>
+        )}
       </div>
-    );
-  }
-
-  return (
-    <div className="screen">
-      <TopBar back="Matches" onBack={() => go({ name: 'home' })} title={title} />
-      <div className={`result ${winner === 'them' ? 'lose' : ''}`}>
-        <div>Game over (auto)</div>
-        <div className="result-title">{winner ? `Winner: ${names[winner]}` : 'No result'}</div>
-        <div>Decided by: {reason}</div>
-        <div className="inline base gap12">
-          <span className="huge">{state.teams.us.score}</span><span>–</span><span className="huge dim">{state.teams.them.score}</span>
+      {practice
+        ? state.order.map((x) => <TeamStatsCard key={x.id} title={`${names[x.id]} this game`} sets={[set]} team={x.id} />)
+        : <TeamStatsCard title={`${names.us} this game`} sets={[set]} />}
+      {!practice && (
+        <div className="card col">
+          <div className="strong">Game {set.setNo + 1}</div>
+          <TeamToggle value={first} onChange={setFirst} names={names} />
+          {editLineup
+            ? <LineupEditor roster={lineup} lineup={lineup} onChange={setLineup} onAddRoster={() => {}} />
+            : <div className="inline between"><span>Order: {lineup.join(' → ')}</span><button className="link" onClick={() => setEditLineup(true)}>Change</button></div>}
         </div>
-      </div>
-      <TeamStatsCard title={`${names.us} this game`} sets={[set]} />
-      <div className="card col">
-        <div className="strong">Game {set.setNo + 1}</div>
-        <TeamToggle value={first} onChange={setFirst} names={names} />
-        {editLineup
-          ? <LineupEditor roster={lineup} lineup={lineup} onChange={setLineup} onAddRoster={() => {}} />
-          : <div className="inline between"><span>Order: {lineup.join(' → ')}</span><button className="link" onClick={() => setEditLineup(true)}>Change</button></div>}
-      </div>
+      )}
       <div className="spacer" />
       <div className="grid3">
         <button className="ghost" onClick={undo}>Fix last throw</button>
-        <button className="ghost" onClick={finishMatch}>End match</button>
-        <button className="primary" onClick={nextSet}>Next game</button>
+        <button className="ghost" onClick={finishMatch}>{practice ? 'Done' : 'End match'}</button>
+        {practice
+          ? <button className="primary" onClick={playAgain}>Play again</button>
+          : <button className="primary" onClick={nextSet}>Next game</button>}
       </div>
     </div>
   );
