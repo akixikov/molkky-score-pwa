@@ -5,6 +5,7 @@ import { KPIS, ourThrows, pct, type Kpi } from '../stats';
 import { tournamentKey, type Match } from '../store';
 import { type Go } from '../ui';
 import { SERIES_COLORS, TEAM_COLOR, TrendChart } from '../components/TrendChart';
+import { TopBar } from '../components/TopBar';
 
 const kpiFmt = (k: Kpi, v: number, digits = 0) => (k.num ? (Number.isNaN(v) ? '—' : v.toFixed(1)) : pct(v, digits));
 
@@ -183,10 +184,7 @@ export function Review({ matches: all, go }: { matches: Match[]; go: Go }) {
   const matches = all.filter((m) => filter === 'all' || m.kind === filter);
   return (
     <div className="screen">
-      <header className="head">
-        <button className="back" onClick={() => go({ name: 'home' })}>← Back</button>
-        <h1>Review</h1>
-      </header>
+      <TopBar back="Back" onBack={() => go({ name: 'home' })} title="Review" />
       <div className="seg">
         <button className={filter === 'all' ? 'on' : ''} onClick={() => setFilter('all')}>All</button>
         <button className={filter === 'tournament' ? 'on' : ''} onClick={() => setFilter('tournament')}>Tournaments</button>

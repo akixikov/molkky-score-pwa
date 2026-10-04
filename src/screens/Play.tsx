@@ -5,6 +5,7 @@ import { setWinner, uid, type AppData, type Match } from '../store';
 import { isPracticeGame, teamNames, type Update, type Go, patchMatch, patchCurrentSet } from '../ui';
 import { Scoreboard, ThrowInput } from '../components/ThrowInput';
 import { SetEnd } from './SetEnd';
+import { TopBar } from '../components/TopBar';
 
 export function Play({ match, update, go }: { match: Match; data: AppData; update: Update; go: Go }) {
   const set = match.sets[match.sets.length - 1];
@@ -37,11 +38,8 @@ export function Play({ match, update, go }: { match: Match; data: AppData; updat
 
   return (
     <div className="screen">
-      <div className="topline">
-        <button className="back" onClick={() => go({ name: 'home' })}>← Matches</button>
-        <span className="center">{title}<br />{names[set.config.firstTeam]} first</span>
-        <button className="ghost small" onClick={() => go({ name: 'match', matchId: match.id, edit: true })}>Edit</button>
-      </div>
+      <TopBar back="Matches" onBack={() => go({ name: 'home' })} title={title} sub={`${names[set.config.firstTeam]} first`}
+        action={<button className="ghost small" onClick={() => go({ name: 'match', matchId: match.id, edit: true })}>Edit</button>} />
       <Scoreboard state={state} current={next} names={names} />
       <ThrowInput
         key={next} state={state} team={next} name={names[next]} player={player}

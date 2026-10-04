@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { MAX_PRACTICE_PLAYERS, type Side } from '../rules';
 import { uid, type AppData, type Match } from '../store';
 import { today, isPracticeGame, type Update, type Go } from '../ui';
-import { RosterChips, MemberInput, LineupEditor } from '../components/Lineup';
+import { RosterChips, MemberInput, LineupEditor, Remove } from '../components/Lineup';
+import { TopBar } from '../components/TopBar';
 
 const MAX_TEAMS = 3;
 
@@ -45,10 +46,7 @@ export function PracticeSetup({ data, update, go }: { data: AppData; update: Upd
 
   return (
     <div className="screen">
-      <header className="head">
-        <button className="back" onClick={() => go({ name: 'home' })}>← Back</button>
-        <h1>Practice game</h1>
-      </header>
+      <TopBar back="Back" onBack={() => go({ name: 'home' })} title="Practice game" />
       <div className="card col">
         <label className="field">Date<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
         <label className="field">Name<input value={session} onChange={(e) => setSession(e.target.value)} placeholder="e.g. Tuesday club practice" /></label>
@@ -72,7 +70,7 @@ export function PracticeSetup({ data, update, go }: { data: AppData; update: Upd
                 <div key={p} className="lineup">
                   <span className="num">{j + 1}</span>
                   <span className="grow">{p}</span>
-                  <button className="ghost small" onClick={() => setTeam(i, members.filter((x) => x !== p))}>×</button>
+                  <Remove name={p} onClick={() => setTeam(i, members.filter((x) => x !== p))} />
                 </div>
               ))}
               {!teamsFull && (

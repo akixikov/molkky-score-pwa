@@ -4,6 +4,7 @@ import { type Team } from '../rules';
 import { uid, type AppData, type Match } from '../store';
 import { today, namesOf, isPracticeGame, type Update, type Go } from '../ui';
 import { LineupEditor, TeamToggle } from '../components/Lineup';
+import { TopBar } from '../components/TopBar';
 
 export function NewMatch({ data, update, go }: { data: AppData; update: Update; go: Go }) {
   const last = data.matches.filter((m) => !isPracticeGame(m)).at(-1);
@@ -26,10 +27,7 @@ export function NewMatch({ data, update, go }: { data: AppData; update: Update; 
 
   return (
     <div className="screen">
-      <header className="head">
-        <button className="back" onClick={() => go({ name: 'home' })}>← Back</button>
-        <h1>New match</h1>
-      </header>
+      <TopBar back="Back" onBack={() => go({ name: 'home' })} title="New match" />
       <div className="card col">
         <label className="field">Date<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
         <label className="field">Tournament<input value={tournament} onChange={(e) => setTournament(e.target.value)} placeholder="e.g. Yamatokoriyama Open" /></label>

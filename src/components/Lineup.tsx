@@ -3,6 +3,17 @@ import { useState } from 'react';
 import { type Team } from '../rules';
 import { type Names } from '../ui';
 
+const icon = (d: string) => (
+  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d={d} /></svg>
+);
+/** Light icon buttons for a member row: move up and remove. */
+export const MoveUp = ({ onClick, hidden }: { onClick: () => void; hidden?: boolean }) => (
+  <button className="icon-btn" aria-label="Move up" style={hidden ? { visibility: 'hidden' } : undefined} onClick={onClick}>{icon('M6 15l6-6 6 6')}</button>
+);
+export const Remove = ({ onClick, name }: { onClick: () => void; name: string }) => (
+  <button className="icon-btn" aria-label={`Remove ${name}`} onClick={onClick}>{icon('M7 7l10 10M17 7 7 17')}</button>
+);
+
 /** Saved members to pick from. In edit mode a tap removes a (mistyped) name from the saved list. */
 export function RosterChips({ names, onPick, onDelete }: { names: string[]; onPick: (n: string) => void; onDelete?: (n: string) => void }) {
   const [editing, setEditing] = useState(false);
@@ -68,13 +79,14 @@ export function LineupEditor({ roster, lineup, onChange, onAddRoster, onRemoveRo
       {lineup.map((p, i) => (
         <div key={p} className="lineup">
           <span className="num">{i + 1}</span>
-          <span className="grow">{p}{i === 0 ? ' (1st)' : ''}</span>
-          <button className="ghost small" disabled={i === 0} onClick={() => {
+          <span className="grow">{p}</span>
+          {/* The first row keeps the space of its move-up button so the columns line up. */}
+          <MoveUp hidden={i === 0} onClick={() => {
             const l = [...lineup];
             [l[i - 1], l[i]] = [l[i], l[i - 1]];
             onChange(l);
-          }}>↑</button>
-          <button className="ghost small" onClick={() => onChange(lineup.filter((x) => x !== p))}>×</button>
+          }} />
+          <Remove name={p} onClick={() => onChange(lineup.filter((x) => x !== p))} />
         </div>
       ))}
       {full ? <div className="muted tiny">Up to {max} players.</div> : (

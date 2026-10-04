@@ -5,6 +5,7 @@ import { uid, type Match, type SetEntry } from '../store';
 import { isPracticeGame, teamNames, dqNames, type Update, type Go, patchMatch, patchCurrentSet } from '../ui';
 import { LineupEditor, TeamToggle } from '../components/Lineup';
 import { TeamStatsCard } from '../components/StatsCards';
+import { TopBar } from '../components/TopBar';
 
 export function SetEnd({ match, set, state, winner, update, go, undo, title }: {
   match: Match; set: SetEntry; state: SetState; winner: SideId | null;
@@ -60,7 +61,7 @@ export function SetEnd({ match, set, state, winner, update, go, undo, title }: {
   if (practice) {
     return (
       <div className="screen">
-        <div className="topline"><button className="back" onClick={() => go({ name: 'home' })}>← Matches</button><span>{title}</span><span /></div>
+        <TopBar back="Matches" onBack={() => go({ name: 'home' })} title={title} />
         <div className="result">
           <div>Game over (auto)</div>
           <div className="result-title">{winner ? `Winner: ${names[winner]}` : 'No result'}</div>
@@ -84,7 +85,7 @@ export function SetEnd({ match, set, state, winner, update, go, undo, title }: {
 
   return (
     <div className="screen">
-      <div className="topline"><button className="back" onClick={() => go({ name: 'home' })}>← Matches</button><span>{title}</span><span /></div>
+      <TopBar back="Matches" onBack={() => go({ name: 'home' })} title={title} />
       <div className={`result ${winner === 'them' ? 'lose' : ''}`}>
         <div>Game over (auto)</div>
         <div className="result-title">{winner ? `Winner: ${names[winner]}` : 'No result'}</div>

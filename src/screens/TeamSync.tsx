@@ -5,6 +5,7 @@ import { type Match } from '../store';
 import { errorText, isConfigured, newSettings, pendingCount, ping, URL_RE, type SyncSettings } from '../sync';
 import { type Go } from '../ui';
 import { type Sync, clock, showsWhenIdle } from '../useTeamSync';
+import { TopBar } from '../components/TopBar';
 
 /** Connects this phone to the team spreadsheet's web app. */
 export function TeamSync({ sync, matches, go }: { sync: Sync; matches: Match[]; go: Go }) {
@@ -24,10 +25,7 @@ export function TeamSync({ sync, matches, go }: { sync: Sync; matches: Match[]; 
   };
   return (
     <div className="screen">
-      <header className="head">
-        <button className="back" onClick={() => go({ name: 'home' })}>← Back</button>
-        <h1>Team sync</h1>
-      </header>
+      <TopBar back="Back" onBack={() => go({ name: 'home' })} title="Team sync" />
       <div className="muted">
         Sends the matches recorded on this phone to the team spreadsheet. Ask the person who set up the sheet for the web app URL and the passphrase.
       </div>

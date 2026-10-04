@@ -3,6 +3,7 @@ import { setWinner, type Match } from '../store';
 import { isPracticeGame, sidesLabel, teamNames, type Go } from '../ui';
 import { TeamStatsCard } from '../components/StatsCards';
 import { ScoreSheet } from '../components/ScoreSheet';
+import { TopBar } from '../components/TopBar';
 
 /** Match result, read-only; Edit opens the edit mode (also for teammates' matches). */
 export function MatchSummary({ match, go }: { match: Match; go: Go }) {
@@ -18,11 +19,7 @@ export function MatchSummary({ match, go }: { match: Match; go: Go }) {
     const w = setWinner(set);
     return (
       <div className="screen">
-        <div className="topline">
-          <button className="back" onClick={() => go({ name: 'home' })}>← Matches</button>
-          <span>{match.tournament || 'Practice'} · {match.date}</span>
-          {editButton}
-        </div>
+        <TopBar back="Matches" onBack={() => go({ name: 'home' })} title={match.tournament || 'Practice'} sub={match.date} action={editButton} />
         <div className="result">
           <div>{sidesLabel(match)}</div>
           <div className="result-title">{w ? `Winner: ${teamNames(match)[w]}` : 'No result'}</div>
@@ -39,11 +36,8 @@ export function MatchSummary({ match, go }: { match: Match; go: Go }) {
 
   return (
     <div className="screen">
-      <div className="topline">
-        <button className="back" onClick={() => go({ name: 'home' })}>← Matches</button>
-        <span>{match.date} · {match.tournament || '(no tournament)'}{match.kind === 'practice' ? ' · Practice' : ''}</span>
-        {editButton}
-      </div>
+      <TopBar back="Matches" onBack={() => go({ name: 'home' })} title={match.tournament || '(no tournament)'}
+        sub={`${match.date}${match.kind === 'practice' ? ' · Practice' : ''}`} action={editButton} />
       <div className={`result ${won < lost ? 'lose' : ''}`}>
         <div>{match.ourTeam ? `${match.ourTeam} ` : ''}vs {match.opponent || 'Opponent'}</div>
         <div className="result-title">{verdict} {won}-{lost}</div>
