@@ -6,8 +6,8 @@ import { type Names, sideClass } from '../ui';
 const dots = (n: number) => <div className="dots">{[0, 1, 2].map((i) => <span key={i} className={i < n ? 'dot on' : 'dot'} />)}</div>;
 
 export function Scoreboard({ state, current, names }: { state: SetState; current: SideId | null; names: Names }) {
-  // Tournament games keep us on the left; practice games follow the throwing order.
-  const ids = 'us' in state.teams && 'them' in state.teams ? ['us', 'them'] : state.order.map((x) => x.id);
+  // Sides in throwing order, as on the score sheet: the first side on the left.
+  const ids = state.order.map((x) => x.id);
   return (
     <div className={ids.length > 2 ? 'grid3' : 'grid2'}>
       {ids.map((t) => {
