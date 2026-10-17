@@ -1,6 +1,7 @@
 // Home: tournaments and practice days, grouped and collapsible.
 import { useState } from 'react';
 
+import { deriveSet } from '../rules';
 import { download, matchResult, newestFirst, setWinner, toCsv, tournamentKey, type AppData, type Match } from '../store';
 import { isConfigured } from '../sync';
 import { today, isPracticeGame, sidesLabel, teamNames, type Update, type Go } from '../ui';
@@ -45,6 +46,12 @@ export function Home({ data, all, update, go, sync }: { data: AppData; all: Matc
     const last = m.sets[m.sets.length - 1];
     return { ...matchResult(m), winner: setWinner(last), decided: !!setWinner(last) || last.closed };
   };
+  // Points per game, us first ("50–32 · 41–50"); a disqualified side shows DQ.
+  const gameScores = (m: Match) => m.sets.filter((s) => s.records.length > 0).map((s) => {
+    const { teams } = deriveSet(s.config, s.records);
+    const pts = (t: 'us' | 'them') => (teams[t]?.eliminated ? 'DQ' : String(teams[t]?.score ?? 0));
+    return `${pts('us')}–${pts('them')}`;
+  }).join(' · ');
   return (
     <div className="screen">
       <header className="brand">
@@ -126,7 +133,13 @@ export function Home({ data, all, update, go, sync }: { data: AppData; all: Matc
                                   </span>
                                 )}
                               </span>
-                              {badge && <span className={`badge ${badge.cls}`}>{badge.text}</span>}
+                              {/* Result on the right, with the points per game under it. */}
+                              {(badge || !practice) && (
+                                <span className="result-col">
+                                  {badge && <span className={`badge ${badge.cls}`}>{badge.text}</span>}
+                                  {!practice && gameScores(m) && <span className="game-scores">{gameScores(m)}</span>}
+                                </span>
+                              )}
                             </button>
                           </div>
                         );
