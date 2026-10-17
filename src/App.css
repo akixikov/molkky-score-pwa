@@ -128,7 +128,7 @@ select { width: auto; }
 .icon-btn:active { background: var(--soft); color: var(--ink); }
 .num { width: 26px; height: 26px; border-radius: 13px; background: var(--accent); color: #fff; display: grid; place-items: center; font-size: 13px; font-weight: 700; }
 
-/* ---------- Recording: scoreboard and the skittle pad ---------- */
+/* ---------- Recording: scoreboard and the score pad ---------- */
 .score { display: flex; flex-direction: column; gap: 2px; }
 .score .label { font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .score.us .label { color: var(--accent); }
@@ -156,18 +156,16 @@ select { width: auto; }
 .thrower { font-size: 18px; font-weight: 700; color: var(--ink); }
 select.thrower { min-height: 40px; padding: 0 10px; }
 
-.pins { --pin: 52px; --pgap: 8px; display: flex; flex-direction: column; gap: var(--pgap); align-items: center; }
-.pinrow { display: flex; gap: var(--pgap); position: relative; }
-.pin { width: var(--pin); height: var(--pin); border-radius: 50%; border: 1.5px solid var(--btnline); background: var(--paper);
+/* Numeric pad: 1-12 four to a row, then undo and a wide 0 (the whole bottom row without undo). */
+.pins { --pin: 52px; --pgap: 8px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--pgap); }
+.pin { height: var(--pin); border-radius: 12px; border: 1.5px solid var(--btnline); background: var(--paper);
   font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 600; min-height: 0; }
 .pin:active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .pin.win { border: 2.5px solid var(--accent); color: var(--accent); font-weight: 700; }
 .pin.burst { border-color: var(--warn); color: var(--warn); border-style: dashed; }
-/* Outside the setup: 0 sits one pin-width left of pin 1, undo left of the back row. */
-.pin.miss { position: absolute; right: calc(100% + var(--pin) + 2 * var(--pgap)); border-color: var(--warn); color: var(--warn); background: var(--warn-bg); }
-/* Left edge aligned with the 0 pin (back row is half a pin wider per side than the front row). */
-.undo { position: absolute; right: calc(100% + var(--pin) / 2 + 1.5 * var(--pgap)); width: var(--pin); height: var(--pin); min-height: 0; border-radius: 50%;
-  display: grid; place-items: center; background: #fff; border: 1.5px solid var(--btnline); color: var(--accent); }
+.pin.miss { grid-column: span 4; border-color: var(--warn); color: var(--warn); background: var(--warn-bg); }
+.undo + .pin.miss { grid-column: span 3; }
+.undo { height: var(--pin); min-height: 0; display: grid; place-items: center; background: #fff; border: 1.5px solid var(--btnline); color: var(--accent); }
 
 /* Short screens (e.g. iPhone SE in Safari): smaller pins and gaps so End game stays on screen. */
 @media (max-height: 600px) {

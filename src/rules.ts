@@ -21,14 +21,6 @@ export const WIN_SCORE = 50;
 export const BURST_RESET = 25;
 export const MAX_FAULTS = 3;
 
-/** Initial pin layout, front row first. Used for the input screen. */
-export const PIN_ROWS: number[][] = [
-  [1, 2],
-  [3, 10, 4],
-  [5, 11, 12, 6],
-  [7, 9, 8],
-];
-
 export interface ThrowRecord {
   id: string;
   team: SideId;

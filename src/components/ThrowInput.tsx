@@ -1,6 +1,6 @@
-// Input screen parts: the scoreboard and the skittle score pad.
+// Input screen parts: the scoreboard and the numeric score pad.
 import { type ReactNode } from 'react';
-import { PIN_ROWS, WIN_SCORE, type SetState, type SideId, type ThrowRecord } from '../rules';
+import { WIN_SCORE, type SetState, type SideId, type ThrowRecord } from '../rules';
 import { type Names, sideClass } from '../ui';
 
 const dots = (n: number) => <div className="dots">{[0, 1, 2].map((i) => <span key={i} className={i < n ? 'dot on' : 'dot'} />)}</div>;
@@ -30,8 +30,8 @@ export function Scoreboard({ state, current, names }: { state: SetState; current
 }
 
 /**
- * Score buttons laid out like the initial pin setup, 0 to the left of the front row. Marks the score
- * that finishes (`need`) and the ones that go over 50; `on` highlights a current score (edit mode).
+ * Score buttons in numeric order, four to a row, with a wide 0 (miss) at the bottom beside undo.
+ * Marks the score that finishes (`need`) and the ones that go over 50; `on` highlights a current score (edit mode).
  */
 export function PinPad({ need, on, onTap, undo, children }: {
   need: number; on?: number; onTap: (score: number) => void; undo?: ReactNode; children?: ReactNode;
@@ -39,15 +39,11 @@ export function PinPad({ need, on, onTap, undo, children }: {
   const pinClass = (n: number) => `pin ${n === need ? 'win' : n > need ? 'burst' : ''} ${n === on ? 'on' : ''}`;
   return (
     <div className="pins">
-      {[...PIN_ROWS].reverse().map((row, i, rows) => (
-        <div key={i} className="pinrow">
-          {i === 0 && undo}
-          {i === rows.length - 1 && <button className={`pin miss ${on === 0 ? 'on' : ''}`} onClick={() => onTap(0)}>0</button>}
-          {row.map((p) => (
-            <button key={p} className={pinClass(p)} onClick={() => onTap(p)}>{p}</button>
-          ))}
-        </div>
+      {Array.from({ length: 12 }, (_, i) => i + 1).map((p) => (
+        <button key={p} className={pinClass(p)} onClick={() => onTap(p)}>{p}</button>
       ))}
+      {undo}
+      <button className={`pin miss ${on === 0 ? 'on' : ''}`} onClick={() => onTap(0)}>0</button>
       {children}
     </div>
   );
