@@ -123,6 +123,11 @@ select { width: auto; }
 /* ---------- Match and practice setup ---------- */
 .lineup { display: flex; align-items: center; gap: 8px; min-height: 44px; }
 .lineup + .lineup { border-top: 1px solid var(--hairline); }
+/* Drag to reorder: the handle takes the touch (no scrolling); the held row lifts above the others. */
+.handle { touch-action: none; cursor: grab; }
+.lineup.moving { position: relative; transition: transform .15s; }
+.lineup.dragging { z-index: 1; transition: none; background: var(--card); box-shadow: 0 4px 14px rgba(0,0,0,.15); border-radius: 10px; }
+.lineup.dragging .handle { cursor: grabbing; color: var(--ink); }
 /* Borderless icon buttons (member rows): a quiet colour, a full-size tap target. */
 .icon-btn { width: 40px; min-height: 40px; padding: 0; border: none; background: none; color: var(--muted); display: grid; place-items: center; border-radius: 20px; flex: none; }
 .icon-btn:active { background: var(--soft); color: var(--ink); }

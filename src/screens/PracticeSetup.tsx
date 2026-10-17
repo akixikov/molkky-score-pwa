@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { MAX_PRACTICE_PLAYERS, type Side } from '../rules';
 import { uid, type AppData, type Match } from '../store';
 import { today, isPracticeGame, type Update, type Go } from '../ui';
-import { RosterChips, MemberInput, LineupEditor, Remove } from '../components/Lineup';
+import { RosterChips, MemberInput, LineupEditor, OrderList } from '../components/Lineup';
 import { TopBar } from '../components/TopBar';
 
 const MAX_TEAMS = 3;
@@ -66,13 +66,7 @@ export function PracticeSetup({ data, update, go }: { data: AppData; update: Upd
                 {teams.length > 2 && <button className="link" onClick={() => setTeams(teams.filter((_, k) => k !== i))}>Remove</button>}
               </div>
               {members.length === 0 && <div className="muted">Tap members below to add them in order</div>}
-              {members.map((p, j) => (
-                <div key={p} className="lineup">
-                  <span className="num">{j + 1}</span>
-                  <span className="grow">{p}</span>
-                  <Remove name={p} onClick={() => setTeam(i, members.filter((x) => x !== p))} />
-                </div>
-              ))}
+              <OrderList items={members} onChange={(l) => setTeam(i, l)} />
               {!teamsFull && (
                 <RosterChips names={data.roster.filter((r) => !assigned.includes(r))} onPick={(r) => setTeam(i, [...members, r])} onDelete={removeRoster} />
               )}
