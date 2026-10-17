@@ -1,7 +1,7 @@
 // Home: tournaments and practice days, grouped and collapsible.
 import { useState } from 'react';
 
-import { download, matchResult, setWinner, toCsv, tournamentKey, type AppData, type Match } from '../store';
+import { download, matchResult, newestFirst, setWinner, toCsv, tournamentKey, type AppData, type Match } from '../store';
 import { isConfigured } from '../sync';
 import { today, isPracticeGame, sidesLabel, teamNames, type Update, type Go } from '../ui';
 import { type Sync, syncChip, syncSummary } from '../useTeamSync';
@@ -23,9 +23,7 @@ export function Home({ data, all, update, go, sync }: { data: AppData; all: Matc
   };
   // Newest first, grouped by tournament (same date, name and kind).
   const groups = new Map<string, Match[]>();
-  // Teammates' matches join by date so the newest still comes first.
-  const ordered = [...all].sort((a, b) => b.date.localeCompare(a.date) || all.indexOf(b) - all.indexOf(a));
-  for (const m of ordered) {
+  for (const m of newestFirst(all)) {
     const key = tournamentKey(m);
     groups.set(key, [...(groups.get(key) ?? []), m]);
   }

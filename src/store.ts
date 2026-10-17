@@ -66,6 +66,20 @@ export function stampChanged(prev: AppData, next: AppData): AppData {
 /** Groups matches of one tournament: same date, name and kind. */
 export const tournamentKey = (m: Pick<Match, 'date' | 'tournament' | 'kind'>) => `${m.date}|${m.tournament}|${m.kind}`;
 
+/** When a match started: its earliest throw, or never (Infinity) while nothing is recorded. */
+export const matchStart = (m: Pick<Match, 'sets'>): number =>
+  Math.min(...m.sets.flatMap((s) => s.records.map((r) => r.ts)));
+
+/**
+ * Matches newest first: by date, then by start time, so games recorded on different phones
+ * interleave as played. Matches with no throw yet count as the newest; ties keep the later one first.
+ */
+export function newestFirst<M extends Pick<Match, 'date' | 'sets'>>(matches: M[]): M[] {
+  return matches.map((m, i) => ({ m, i, start: matchStart(m) }))
+    .sort((a, b) => b.m.date.localeCompare(a.m.date) || (b.start === a.start ? 0 : b.start > a.start ? 1 : -1) || b.i - a.i)
+    .map((x) => x.m);
+}
+
 export const uid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
 
 export function setWinner(s: SetEntry): SideId | null {
