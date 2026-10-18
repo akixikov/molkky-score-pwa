@@ -1,17 +1,20 @@
 // Edit mode's score pad: docked at the bottom, it writes into the selected cell of the score sheet.
+import { type ReactNode } from 'react';
 import { deriveSet, lineupOf, WIN_SCORE } from '../rules';
 import { PinPad } from './ThrowInput';
 import { type Match } from '../store';
 import { type Names } from '../ui';
 import { canAdd, type Cursor } from '../editDraft';
 
-export function EditPad({ match, cursor, names, late, onScore, onPlayer, onFirst, onClose }: {
+export function EditPad({ match, cursor, names, late, onScore, onPlayer, onFirst, onClose, undo }: {
   match: Match; cursor: Cursor; names: Names;
   /** The last tap tried to add a throw after the end of the game. */
   late: boolean;
   onScore: (n: number) => void; onPlayer: (p: string) => void;
   /** Makes the selected side throw first in this game (when that lets its throw count). */
   onFirst: () => void; onClose: () => void;
+  /** Undo button beside 0 (recording screen). */
+  undo?: ReactNode;
 }) {
   const set = match.sets.find((s) => s.id === cursor.setId);
   if (!set) return null;
@@ -39,7 +42,7 @@ export function EditPad({ match, cursor, names, late, onScore, onPlayer, onFirst
           </select>
         </label>
       )}
-      <PinPad need={need} on={rec?.score} onTap={onScore} />
+      <PinPad need={need} on={rec?.score} onTap={onScore} undo={undo} />
       {!rec && !canAdd(set, team) ? (
         // Only offered when making this side first lets the throw count (see canOffer).
         <div className="warn-text tiny">

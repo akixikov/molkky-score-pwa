@@ -49,6 +49,17 @@ export function PinPad({ need, on, onTap, undo, children }: {
   );
 }
 
+/** Removes the throw entered last. */
+export function UndoButton({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
+  return (
+    <button className="undo" aria-label="Undo last throw" title="Undo last throw" disabled={disabled} onClick={onClick}>
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+      </svg>
+    </button>
+  );
+}
+
 /** Score pad for the next throw; one tap records a throw of that score. */
 export function ThrowInput({ state, team, name, player, lineup, onPlayer, onThrow, canUndo, onUndo }: {
   state: SetState; team: SideId; name: string; player?: string; lineup?: string[];
@@ -71,13 +82,7 @@ export function ThrowInput({ state, team, name, player, lineup, onPlayer, onThro
           )
           : player && player !== name && <span className="thrower">{player}</span>}
       </div>
-      <PinPad need={need} onTap={tap} undo={
-        <button className="undo" aria-label="Undo last throw" title="Undo last throw" disabled={!canUndo} onClick={onUndo}>
-          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
-          </svg>
-        </button>
-      } />
+      <PinPad need={need} onTap={tap} undo={<UndoButton disabled={!canUndo} onClick={onUndo} />} />
     </>
   );
 }

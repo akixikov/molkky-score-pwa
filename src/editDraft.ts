@@ -1,5 +1,5 @@
 // Edit mode for a match: changes collect in a draft and are saved together.
-import { deriveSet, inTurnOrder, nextThrower, playableLength, type SideId, type ThrowRecord } from './rules';
+import { deriveSet, inTurnOrder, nextThrower, playableLength, sidesOf, type SideId, type ThrowRecord } from './rules';
 import { uid, type Match, type SetEntry } from './store';
 
 /** The selected cell: a recorded throw, or the next throw of a side (its blank cell). */
@@ -14,7 +14,8 @@ const withThrow = (s: SetEntry, rec: ThrowRecord) => inTurnOrder(s.config, [...s
 const counts = (s: SetEntry, rec: ThrowRecord) => deriveSet(s.config, withThrow(s, rec)).rows.some((r) => r.id === rec.id);
 
 /** The side can take another throw at the end of its column (the game is not over before it). */
-export const canAdd = (s: SetEntry, team: SideId): boolean => counts(s, { id: '?', team, score: 0, ts: 0 });
+export const canAdd = (s: SetEntry, team: SideId): boolean =>
+  !deriveSet(s.config, s.records).teams[team]?.eliminated && counts(s, { id: '?', team, score: 0, ts: 0 });
 
 /**
  * The side's blank cell takes a throw: it would count, or would if the side had thrown first
@@ -28,6 +29,27 @@ function below(s: SetEntry, team: SideId, after?: string): Cursor | null {
   const i = after ? col.findIndex((r) => r.id === after) : -1;
   if (after && i >= 0 && i + 1 < col.length) return { setId: s.id, recordId: col[i + 1].id };
   return canOffer(s, team) ? { setId: s.id, team, player: nextThrower(s.config, s.records, team) } : null;
+}
+
+/**
+ * The blank cell of the first side, in throwing order, that can take another throw; with `after`,
+ * the search starts from the side after that one (moving on once a column is done).
+ */
+export function firstBlank(s: SetEntry, after?: SideId): Cursor | null {
+  const ids = sidesOf(s.config).map((x) => x.id);
+  const from = after ? ids.indexOf(after) + 1 : 0;
+  for (let k = 0; k < ids.length; k++) {
+    const team = ids[(from + k) % ids.length];
+    if (canAdd(s, team)) return { setId: s.id, team, player: nextThrower(s.config, s.records, team) };
+  }
+  return null;
+}
+
+/** Records without the throw entered last (by entry time; the last one on ties). */
+export function withoutLatest(records: ThrowRecord[]): ThrowRecord[] {
+  let k = -1;
+  records.forEach((r, i) => { if (k < 0 || r.ts >= records[k].ts) k = i; });
+  return records.filter((_, i) => i !== k);
 }
 
 /**

@@ -1,6 +1,6 @@
 // Local persistence (IndexedDB via idb-keyval) and exports.
 import { get, set } from 'idb-keyval';
-import { deriveSet, type SetConfig, type SideId, type ThrowRecord } from './rules';
+import { deriveSet, playableLength, type SetConfig, type SideId, type ThrowRecord } from './rules';
 
 export type MatchKind = 'tournament' | 'practice';
 
@@ -83,7 +83,11 @@ export function newestFirst<M extends Pick<Match, 'date' | 'sets'>>(matches: M[]
 export const uid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
 
 export function setWinner(s: SetEntry): SideId | null {
-  return s.manualWinner ?? deriveSet(s.config, s.records).winner;
+  if (s.manualWinner) return s.manualWinner;
+  // A game still being recorded can have a column filled ahead of the others (score sheet entry):
+  // it is decided only once every side has thrown up to the end.
+  const records = s.closed ? s.records : s.records.slice(0, playableLength(s.config, s.records));
+  return deriveSet(s.config, records).winner;
 }
 
 /** Games won and lost by us in a match, and the verdict they give. */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { deriveSet, type ThrowRecord } from './rules';
-import { type Match } from './store';
-import { addsIfFirst, applyFirst, canOffer, applyPlayer, applyScore, applyWinner, canAdd, finalize, removeGame, type Cursor } from './editDraft';
+import { deriveSet, inTurnOrder, type ThrowRecord } from './rules';
+import { setWinner, type Match } from './store';
+import { addsIfFirst, applyFirst, canOffer, applyPlayer, applyScore, applyWinner, canAdd, finalize, firstBlank, removeGame, withoutLatest, type Cursor } from './editDraft';
 
 let seq = 0;
 const t = (team: string, score: number, player?: string): ThrowRecord => ({ id: `r${++seq}`, team, player, score, ts: seq });
@@ -97,5 +97,36 @@ describe('edit draft', () => {
     expect(deriveSet(r.match.sets[0].config, r.match.sets[0].records).winner).toBe('us');
     // Nothing is dropped on save: the game is in turn order for the new first side.
     expect(finalize(m, r.match).dropped).toBe(0);
+  });
+});
+
+describe('score sheet entry while recording', () => {
+  const live = (records: ThrowRecord[]) => ({ ...game('g1', records), closed: false });
+
+  it('decides a game only once every side has thrown up to the end', () => {
+    // Our column reaches 50 on turn 5 before the opponent's column is entered.
+    const ours = [t('us', 10, 'A'), t('us', 10, 'B'), t('us', 10, 'A'), t('us', 10, 'B'), t('us', 10, 'A')];
+    expect(setWinner(live(ours))).toBeNull();
+    // The same throws in a finished game (e.g. imported without opponent throws) still count.
+    expect(setWinner(game('g1', ours))).toBe('us');
+    const theirs = [1, 2, 3, 4].map((n) => t('them', n));
+    const both = inTurnOrder(live([]).config, [...ours, ...theirs]);
+    expect(setWinner(live(both))).toBe('us');
+  });
+
+  it('moves on to the next column once a side is done', () => {
+    const s = live([t('us', 12, 'A'), t('us', 12, 'B'), t('us', 12, 'A'), t('us', 0, 'B'), t('us', 0, 'A'), t('us', 0, 'B')]);
+    // Us is disqualified after three misses: no more throws in its column.
+    expect(canAdd(s, 'us')).toBe(false);
+    expect(firstBlank(s)).toMatchObject({ team: 'them' });
+    expect(firstBlank(live([]), 'us')).toMatchObject({ team: 'them' });
+    expect(firstBlank(live([]))).toMatchObject({ team: 'us', player: 'A' });
+  });
+
+  it('undoes the throw entered last, wherever it sits in turn order', () => {
+    const a = { ...t('us', 5), ts: 3 };
+    const b = { ...t('them', 6), ts: 1 };
+    const c = { ...t('us', 7), ts: 2 };
+    expect(withoutLatest([a, b, c]).map((r) => r.score)).toEqual([6, 7]);
   });
 });
