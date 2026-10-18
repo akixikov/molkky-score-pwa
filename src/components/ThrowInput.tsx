@@ -30,7 +30,7 @@ export function Scoreboard({ state, current, names }: { state: SetState; current
 }
 
 /**
- * Score buttons in numeric order, four to a row, with a wide 0 (miss) at the bottom beside undo.
+ * Score buttons from 12 down to 1, four to a row, with 0 (miss) at the bottom, as wide as undo beside it.
  * Marks the score that finishes (`need`) and the ones that go over 50; `on` highlights a current score (edit mode).
  */
 export function PinPad({ need, on, onTap, undo, children }: {
@@ -39,7 +39,7 @@ export function PinPad({ need, on, onTap, undo, children }: {
   const pinClass = (n: number) => `pin ${n === need ? 'win' : n > need ? 'burst' : ''} ${n === on ? 'on' : ''}`;
   return (
     <div className="pins">
-      {Array.from({ length: 12 }, (_, i) => i + 1).map((p) => (
+      {Array.from({ length: 12 }, (_, i) => 12 - i).map((p) => (
         <button key={p} className={pinClass(p)} onClick={() => onTap(p)}>{p}</button>
       ))}
       {undo}

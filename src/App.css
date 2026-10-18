@@ -170,9 +170,9 @@ select.thrower { min-height: 40px; padding: 0 10px; }
 .pin:active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .pin.win { border: 2.5px solid var(--accent); color: var(--accent); font-weight: 700; }
 .pin.burst { border-color: var(--warn); color: var(--warn); border-style: dashed; }
-.pin.miss { grid-column: span 4; border-color: var(--warn); color: var(--warn); background: var(--warn-bg); }
-.undo + .pin.miss { grid-column: span 3; }
-.undo { height: var(--pin); min-height: 0; display: grid; place-items: center; background: #fff; border: 1.5px solid var(--btnline); color: var(--accent); }
+.pin.miss { grid-column: span 4; }
+.undo + .pin.miss { grid-column: span 2; }
+.undo { grid-column: span 2; height: var(--pin); min-height: 0; display: grid; place-items: center; background: #fff; border: 1.5px solid var(--btnline); color: var(--accent); }
 
 /* Short screens (e.g. iPhone SE in Safari): smaller pins and gaps so End game stays on screen. */
 @media (max-height: 600px) {
