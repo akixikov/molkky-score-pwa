@@ -3,6 +3,9 @@
 チーム（3〜4人）が大会・練習でモルックの投擲をスマホに記録し、振り返り（チームと個人の KPI 推移）を得る PWA。戦況の分析や助言は記録後にオフラインで行う方針で、入力中のヒントは出さない。チーム共有の Google スプレッドシートと同期できる。
 公開先: GitHub Pages（`https://<ユーザー名>.github.io/<リポジトリ名>/`。`main` への push で GitHub Actions が自動デプロイ）
 
+## セッション開始時にやること
+- 特になし。コンテナを作り直した後は `npm install` をやり直す（Node のバージョンは下の「開発環境の注意」）
+
 ## コマンド
 - `npm install` / `npm run dev`（`http://localhost:5173/<リポジトリ名>/`。パスは `package.json` の `name` から決まる）
 - `npm test`（= `vitest run`）— テスト。`fixtures-private/molkkylog.json` があれば実データ照合テストも走る
