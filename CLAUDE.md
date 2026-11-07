@@ -20,6 +20,7 @@
 - `src/App.tsx` — 画面の切り替えだけ。`src/screens/`（Home・NewMatch・PracticeSetup・Play・SetEnd・MatchSummary・MatchEdit・Review・TeamSync）、`src/components/`（ScoreSheet・TrendChart など）、`src/ui.ts`（遷移の型と共通ヘルパー）、`App.css`
 - `vite.config.ts` — base は `package.json` の `name` から自動生成（フォークしてリポジトリ名を変えたら `package.json` の `name` も合わせる）、vite-plugin-pwa
 - `.github/workflows/deploy.yml` — test → build → Pages
+- `tools/scoresheet-ocr/` — 大会の紙のスコアシートの写真から自チームの投擲を起こす補助ツール（Python・OpenCV。数字は Claude のセッションで読む。使い方は同フォルダの README）
 
 ## 守ること
 - **記録は事実だけ**（誰が投げたか、1投ごとの得点）。倒れたピンは記録しない（古い記録には `pins` が残っている）。合計・イベント・勝敗は保存せず、常に `deriveSet` で導出する
