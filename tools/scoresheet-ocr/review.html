@@ -1,0 +1,234 @@
+<title>{{title}}</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: the PWA's paper score sheet, one match per section; each game sits beside the photo it was read from. */
+:root {
+  --bg: #F3EFE6; --card: #FFFFFF; --line: #DDD6C8; --ink: #1E2A22; --muted: #5E6A60;
+  --accent: #2E6B4E; --warn: #A84B14; --warn-bg: #FBEBDD; --opp: #2F5D8A; --opp-bg: #E6EDF4;
+  --paper: #FFFDF8; --sheet-ink: #2B2B2B; --sheet-rule: #BDB6A6; --sheet-idle: #F6F2E9; --sheet-total: #FAF6EC;
+  --win-bg: #DCEBE2;
+  --font-body: 'Zen Kaku Gothic New', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  --font-num: 'Barlow Condensed', 'Zen Kaku Gothic New', 'Arial Narrow', sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #171C19; --card: #202723; --line: #34403A; --ink: #E7ECE8; --muted: #9AA79F;
+    --accent: #6FBF97; --warn: #E89A66; --warn-bg: #3A2A20; --opp: #86B2DE; --opp-bg: #1F2B38;
+    --paper: #1D2420; --sheet-ink: #C9D2CC; --sheet-rule: #3E4A44; --sheet-idle: #242C27; --sheet-total: #222A25;
+    --win-bg: #22382C; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #171C19; --card: #202723; --line: #34403A; --ink: #E7ECE8; --muted: #9AA79F;
+  --accent: #6FBF97; --warn: #E89A66; --warn-bg: #3A2A20; --opp: #86B2DE; --opp-bg: #1F2B38;
+  --paper: #1D2420; --sheet-ink: #C9D2CC; --sheet-rule: #3E4A44; --sheet-idle: #242C27; --sheet-total: #222A25;
+  --win-bg: #22382C; color-scheme: dark;
+}
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+}
+.wrap { max-width: 1080px; margin: 0 auto; display: grid; gap: 28px; }
+header { display: grid; gap: 8px; }
+.eyebrow { font-size: 12px; letter-spacing: 0.08em; color: var(--muted); }
+h1 { margin: 0; font-size: 26px; line-height: 1.3; text-wrap: balance; }
+h2 { margin: 0; font-size: 19px; text-wrap: balance; }
+p { margin: 0; max-width: 65ch; }
+.muted { color: var(--muted); font-size: 13px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); align-items: center; }
+.legend b { font-family: var(--font-num); font-size: 17px; color: var(--ink); font-weight: 700; }
+.legend .miss { color: var(--warn); }
+.legend .fin { display: inline-block; min-width: 26px; text-align: center; border: 1.5px solid var(--accent); border-radius: 50%; color: var(--accent); line-height: 22px; }
+.legend .over { text-decoration: underline wavy var(--warn); text-underline-offset: 3px; }
+
+.summary { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.summary table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.summary th, .summary td { padding: 8px 12px; text-align: left; border-top: 1px solid var(--line); }
+.summary thead th { border-top: none; font-size: 12px; color: var(--muted); font-weight: 500; }
+.summary td.num { font-family: var(--font-num); font-size: 17px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.summary a { color: inherit; text-decoration: none; border-bottom: 1px solid var(--line); }
+.summary a:hover, .summary a:focus-visible { border-bottom-color: var(--accent); outline: none; }
+.res { display: inline-block; min-width: 2.4em; text-align: center; border-radius: 999px; padding: 0 8px; font-size: 12px; font-weight: 700; }
+.res.w { background: var(--win-bg); color: var(--accent); }
+.res.l { background: var(--warn-bg); color: var(--warn); }
+.res.d { background: var(--opp-bg); color: var(--opp); }
+.flag { color: var(--warn); font-size: 12px; font-weight: 700; white-space: nowrap; }
+
+section.match { display: grid; gap: 14px; scroll-margin-top: 16px; }
+.match-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; border-bottom: 1.5px solid var(--sheet-ink); padding-bottom: 6px; }
+.game { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 300px); gap: 14px; align-items: start; }
+@media (max-width: 760px) { .game { grid-template-columns: minmax(0, 1fr); } }
+.game > * { min-width: 0; }
+figure { margin: 0; display: grid; gap: 4px; }
+figure img { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 4px; display: block; }
+figcaption { font-size: 12px; color: var(--muted); }
+.notes { margin: 8px 0 0; padding: 8px 12px 8px 28px; background: var(--warn-bg); border-radius: 6px; font-size: 13px; display: grid; gap: 2px; }
+.notes li::marker { color: var(--warn); }
+
+/* Score sheet, as in the PWA (src/App.css .sheet) */
+.sheet { background: var(--paper); border: 1.5px solid var(--sheet-ink); border-radius: 4px; }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1.5px solid var(--sheet-ink); }
+.sheet-head .strong { font-weight: 700; }
+.sheet-scroll { overflow-x: auto; }
+.sheet table { border-collapse: collapse; font-family: var(--font-num); font-size: 17px; table-layout: fixed; font-variant-numeric: tabular-nums; }
+.sheet th, .sheet td { border: 1px solid var(--sheet-rule); padding: 3px 4px; text-align: center; height: 28px; min-width: 34px; }
+.sheet tr > :first-child { border-left: none; }
+.sheet tr > :last-child { border-right: none; }
+.sheet tbody tr:last-child td { border-bottom: 1.5px solid var(--sheet-ink); }
+.sheet th { font-family: var(--font-body); font-size: 11px; color: var(--muted); font-weight: 700; }
+.sheet th.team { font-size: 12px; border-bottom: 1px solid var(--sheet-rule); }
+.sheet th.team.us { color: var(--accent); }
+.sheet th.team.them { color: var(--opp); }
+.sheet .turn { width: 36px; padding-inline: 2px; color: var(--muted); font-size: 13px; background: var(--bg); }
+.sheet th.who { max-width: 56px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+.sheet .idle { background: var(--sheet-idle); }
+.sheet .tot { font-weight: 700; border-right-width: 1.5px; border-right-color: var(--sheet-ink); background: var(--sheet-total); min-width: 40px; }
+.sheet .miss { color: var(--warn); font-weight: 700; }
+.sheet .over span { text-decoration: underline wavy var(--warn); text-underline-offset: 3px; }
+.sheet .fin span { display: inline-block; min-width: 26px; border: 1.5px solid var(--accent); border-radius: 50%; color: var(--accent); line-height: 22px; }
+.sheet tfoot td { font-size: 22px; font-weight: 700; height: 36px; }
+.sheet .final.won { color: var(--accent); }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">{{eyebrow}}</div>
+    <h1>{{title}}</h1>
+    <p>紙のスコアシート{{sheets}}枚から読み取った結果です。PWA と同じ形式で、各ゲームの横に読み取った用紙の表を並べています。用紙と見比べて、違うところを教えてください。</p>
+    <div class="legend">
+      <span><b class="miss">×</b> ミス</span>
+      <span><b class="fin">50</b> 上がり</span>
+      <span><b class="over">25</b> 50点超えで25点に戻る</span>
+      <span>(1st) 先攻</span>
+    </div>
+  </header>
+  <div class="summary">
+    <table id="summary">
+      <thead><tr><th>試合</th><th>相手</th><th>結果</th><th>ゲーム</th><th>確認</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div id="matches" class="wrap"></div>
+</div>
+
+<script>
+const DATA = /*DATA*/null;
+const WIN = 50, RESET = 25, MAX_FAULTS = 3;
+
+// Same derivation as src/rules.ts deriveSet (tournament: us vs them).
+function deriveSet(set) {
+  const first = set.config.firstTeam;
+  const order = first === 'us' ? ['us', 'them'] : ['them', 'us'];
+  const teams = { us: { score: 0, fault: 0, eliminated: false }, them: { score: 0, fault: 0, eliminated: false } };
+  const rows = [];
+  let winner = null, endReason = null;
+  for (const rec of set.records) {
+    const t = teams[rec.team];
+    const total = t.score + rec.score;
+    let after = total, event = rec.score === 0 ? 'Miss' : '';
+    if (total > WIN) { after = RESET; event = 'Over'; }
+    else if (total === WIN) { event = 'Finish'; }
+    t.score = after;
+    t.fault = rec.score === 0 ? t.fault + 1 : 0;
+    if (t.fault >= MAX_FAULTS) { t.eliminated = true; event = 'Eliminated'; }
+    rows.push({ ...rec, after, event });
+    if (event === 'Finish') { winner = rec.team; endReason = 'finish'; break; }
+    if (event === 'Eliminated') { winner = rec.team === 'us' ? 'them' : 'us'; endReason = 'dq'; break; }
+  }
+  return { order, teams, rows, winner, endReason };
+}
+
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') n.className = v; else if (k === 'text') n.textContent = v; else n.setAttribute(k, v);
+  }
+  for (const k of kids) if (k != null) n.append(k);
+  return n;
+};
+
+function scoreSheet(set, names) {
+  const st = deriveSet(set);
+  const byTeam = (t) => st.rows.filter((r) => r.team === t);
+  const cols = st.order.map(byTeam);
+  const turns = Math.max(0, ...cols.map((c) => c.length));
+  const scoreCols = (t) => t === 'us' ? [...new Set([...set.config.lineup, ...byTeam('us').map((r) => r.player)])] : [''];
+
+  const head1 = el('tr', {}, el('th', { rowspan: 2, class: 'turn', text: 'Turn' }));
+  const head2 = el('tr');
+  for (const t of st.order) {
+    head1.append(el('th', { colspan: scoreCols(t).length + 1, class: `team ${t}`, text: names[t] + (t === set.config.firstTeam ? ' (1st)' : '') }));
+    for (const p of scoreCols(t)) head2.append(el('th', { class: p ? 'who' : '', text: p || 'Pts' }));
+    head2.append(el('th', { class: 'tot', text: 'Total' }));
+  }
+  const body = el('tbody');
+  for (let i = 0; i < turns; i++) {
+    const tr = el('tr', {}, el('td', { class: 'turn', text: String(i + 1) }));
+    st.order.forEach((t, k) => {
+      const r = cols[k][i];
+      const perPlayer = scoreCols(t)[0] !== '';
+      for (const p of scoreCols(t)) {
+        if (r && (!perPlayer || r.player === p)) {
+          tr.append(el('td', { class: r.score === 0 ? 'miss' : '', text: r.score === 0 ? '×' : String(r.score) }));
+        } else tr.append(el('td', { class: perPlayer ? 'idle' : '' }));
+      }
+      if (!r) tr.append(el('td', { class: 'tot' }));
+      else {
+        const cls = `tot ${r.event === 'Over' ? 'over' : ''} ${r.event === 'Finish' ? 'fin' : ''}`;
+        tr.append(el('td', { class: cls }, r.event === 'Eliminated' ? 'DQ' : el('span', { text: String(r.after) })));
+      }
+    });
+    body.append(tr);
+  }
+  const foot = el('tr', {}, el('td', { class: 'turn', text: 'Σ' }));
+  for (const t of st.order) {
+    foot.append(el('td', { colspan: scoreCols(t).length + 1, class: `final ${st.winner === t ? 'won' : ''}`,
+      text: st.teams[t].eliminated ? 'DQ' : String(st.teams[t].score) }));
+  }
+  const end = st.endReason === 'finish' ? 'Reached 50' : st.endReason === 'dq' ? 'DQ' : '';
+  return el('div', { class: 'sheet' },
+    el('div', { class: 'sheet-head' },
+      el('span', { class: 'strong', text: `Game ${set.setNo}` }),
+      el('span', { class: 'muted', text: st.winner ? `Winner: ${names[st.winner]} · ${end}` : 'In progress' })),
+    el('div', { class: 'sheet-scroll' },
+      el('table', {}, el('thead', {}, head1, head2), body, el('tfoot', {}, foot))));
+}
+
+const sumBody = document.querySelector('#summary tbody');
+const root = document.getElementById('matches');
+DATA.matches.forEach((m, idx) => {
+  const pg = DATA.page[idx];
+  const names = { us: m.ourTeam, them: m.opponent };
+  const states = m.sets.map(deriveSet);
+  const won = states.filter((s) => s.winner === 'us').length;
+  const lost = states.filter((s) => s.winner === 'them').length;
+  const nNotes = pg.games.reduce((a, g) => a + g.notes.length, 0);
+  const anchor = `match-${idx + 1}`;
+  const res = won > lost ? 'w' : won < lost ? 'l' : 'd';
+  const verdict = { w: '勝ち', l: '負け', d: '引き分け' }[res];
+
+  sumBody.append(el('tr', {},
+    el('td', {}, el('a', { href: `#${anchor}`, text: pg.label })),
+    el('td', { text: m.opponent }),
+    el('td', {}, el('span', { class: `res ${res}`, text: `${won}–${lost}` })),
+    el('td', { class: 'num', text: states.map((s) => `${s.teams.us.score}–${s.teams.them.score}`).join('  ') }),
+    el('td', {}, nNotes ? el('span', { class: 'flag', text: `${nNotes}件` }) : el('span', { class: 'muted', text: '—' }))));
+
+  const sec = el('section', { class: 'match', id: anchor },
+    el('div', { class: 'match-head' },
+      el('h2', { text: `${pg.label} vs ${m.opponent}` }),
+      el('span', { class: 'muted', text: [pg.court && `${pg.court}コート`, `${verdict} ${won}–${lost}`, pg.photo].filter(Boolean).join(' · ') })));
+  m.sets.forEach((s, i) => {
+    const g = pg.games[i];
+    const left = el('div', {}, scoreSheet(s, names));
+    if (g.notes.length) left.append(el('ul', { class: 'notes' }, ...g.notes.map((t) => el('li', { text: t }))));
+    sec.append(el('div', { class: 'game' }, left,
+      el('figure', {}, el('img', { src: g.img, alt: `${pg.photo} ゲーム${i + 1} の用紙（台形補正後）`, loading: 'lazy' }),
+        el('figcaption', { text: `用紙 ゲーム${i + 1}（台形補正後）` }))));
+  });
+  root.append(sec);
+});
+</script>

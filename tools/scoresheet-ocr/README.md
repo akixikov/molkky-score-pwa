@@ -24,7 +24,10 @@
    - 相手チームも同じ手順で読む（`sides.json` の A/B を逆にして `strips` → `readings_them.txt` → `solved_them.json`）
 6. **試合データにする** — `python3 tools/scoresheet-ocr/matches.py $W/solved.json $W/solved_them.json $W/meta.json > $W/matches.json`
    - `meta.json` に試合ごとの日付・大会名・相手・ゲームごとの表と先攻を書く（書式は `matches.py` の先頭）
-7. **チームのシートに追加する** — 行を作り、Games と Throws のタブの末尾に**追加だけ**する（既存の行は触らない）
+7. **確認してもらう** — `python3 tools/scoresheet-ocr/review.py $W $W/matches.json $W/meta.json $W/review.html`
+   - PWA と同じスコアシートの形で、各ゲームの横に用紙の表を並べたページ。依頼者に見せて、シートに書く前に必ず確認をもらう
+   - 読みにくいマスやルールに合わない行（`check` 付きの行、選手名、先攻）は、ページを作る前にその場で依頼者に聞く
+8. **チームのシートに追加する** — 行を作り、Games と Throws のタブの末尾に**追加だけ**する（既存の行は触らない）
    ```sh
    npx -p node@22 node node_modules/rolldown/bin/cli.mjs tools/scoresheet-ocr/sheet-rows.ts --platform node --format esm --file $W/sheet-rows.mjs
    node $W/sheet-rows.mjs $W/matches.json > $W/rows.json   # {"games": [...], "throws": [...]}
